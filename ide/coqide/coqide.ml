@@ -1226,7 +1226,7 @@ let show_hide_query_pane sn =
   let ccw = sn.command in
   if ccw#visible then ccw#hide else ccw#show
 
-let zoom_fit sn =
+let zoom_100 sn =
   let script = sn.script in
   let space = script#misc#allocation.Gtk.width in
   let cols = script#right_margin_position in
@@ -1415,31 +1415,31 @@ let build_ui () =
     item "New" ~callback:File.newfile ~stock:`NEW;
     item "Open" ~callback:(File.load ~parent:w) ~stock:`OPEN;
     item "Save" ~callback:(File.save ~parent:w) ~stock:`SAVE ~tooltip:"Save current buffer";
-    item "Save as" ~label:"S_ave as" ~stock:`SAVE_AS ~callback:(File.saveas ~parent:w);
+    item "Save as" ~stock:`SAVE_AS ~callback:(File.saveas ~parent:w);
     item "Save all" ~label:"Sa_ve all" ~callback:File.saveall;
     item "Close buffer" ~label:"_Close buffer" ~stock:`CLOSE
       ~callback:(File.close_buffer ~parent:w) ~tooltip:"Close current buffer";
     item "Print..." ~label:"_Print..."
       ~callback:File.print ~stock:`PRINT ~accel:"<Ctrl>p";
-    item "Rehighlight" ~label:"Reh_ighlight" ~accel:"<Ctrl>l"
+    item "Rehighlight" ~label:"Re_highlight" ~accel:"<Ctrl>l"
       ~callback:File.highlight ~stock:`REFRESH;
     item "Quit" ~stock:`QUIT ~callback:(File.quit ~parent:w);
   ];
 
   menu export_menu [
     item "Export to" ~label:"E_xport to";
-    item "Html" ~label:"_Html" ~callback:(File.export "html");
+    item "Html" ~label:"_HTML" ~callback:(File.export "html");
     item "Latex" ~label:"_LaTeX" ~callback:(File.export "latex");
-    item "Dvi" ~label:"_Dvi" ~callback:(File.export "dvi");
-    item "Pdf" ~label:"_Pdf" ~callback:(File.export "pdf");
-    item "Ps" ~label:"_Ps" ~callback:(File.export "ps");
+    item "Dvi" ~label:"_DVI" ~callback:(File.export "dvi");
+    item "Pdf" ~label:"_PDF" ~callback:(File.export "pdf");
+    item "Ps" ~label:"P_ostScript" ~callback:(File.export "ps");
   ];
 
   menu edit_menu [
     item "Edit" ~label:"_Edit";
-    item "Undo" ~accel:"<Primary>u" ~stock:`UNDO
+    item "Undo" ~accel:"<Primary>z" ~stock:`UNDO
       ~callback:(cb_on_current_term (fun t -> t.script#undo ()));
-    item "Redo" ~stock:`REDO
+    item "Redo" ~accel:"<Primary>y" ~stock:`REDO
       ~callback:(cb_on_current_term (fun t -> t.script#redo ()));
     item "Cut" ~stock:`CUT
       ~callback:(fun _ -> emit_to_focus w GtkText.View.S.cut_clipboard);
@@ -1468,31 +1468,31 @@ let build_ui () =
 
   menu view_menu [
     item "View" ~label:"_View";
-    item "Previous tab" ~label:"_Previous tab" ~accel:"<Alt>Left"
+    item "Previous tab" ~accel:"<Primary>Page_Up"
       ~stock:`GO_BACK
       ~callback:(fun _ -> notebook#previous_page ());
-    item "Next tab" ~label:"_Next tab" ~accel:"<Alt>Right"
+    item "Next tab" ~accel:"<Primary>Page_Down"
       ~stock:`GO_FORWARD
       ~callback:(fun _ -> notebook#next_page ());
-    item "Zoom in" ~label:"_Zoom in" ~accel:("<Primary>plus")
+    item "Zoom in" ~accel:("<Primary>plus")
         ~stock:`ZOOM_IN ~callback:(fun _ ->
           let ft = Pango.Font.from_string text_font#get in
           Pango.Font.set_size ft (Pango.Font.get_size ft + Pango.scale);
           text_font#set (Pango.Font.to_string ft);
           save_pref ());
-    item "Zoom out" ~label:"_Zoom out" ~accel:("<Primary>minus")
+    item "Zoom out" ~accel:("<Primary>minus")
         ~stock:`ZOOM_OUT ~callback:(fun _ ->
           let ft = Pango.Font.from_string text_font#get in
           Pango.Font.set_size ft (Pango.Font.get_size ft - Pango.scale);
           text_font#set (Pango.Font.to_string ft);
           save_pref ());
-    item "Zoom fit" ~label:"_Zoom fit" ~accel:("<Primary>0")
-        ~stock:`ZOOM_FIT ~callback:(cb_on_current_term MiscMenu.zoom_fit);
+    item "Zoom 100" ~accel:("<Primary>0")
+        ~stock:`ZOOM_100 ~callback:(cb_on_current_term MiscMenu.zoom_100);
     toggle_item "Show Toolbar" ~label:"Show _Toolbar"
       ~active:(show_toolbar#get)
       ~callback:(fun _ -> show_toolbar#set (not show_toolbar#get));
     item "Query Pane" ~label:"_Query Pane"
-      ~accel:"F1"
+      ~accel:"F2"
       ~callback:(cb_on_current_term MiscMenu.show_hide_query_pane);
     GAction.group_radio_actions
       ~init_value:(
@@ -1529,7 +1529,7 @@ let build_ui () =
   ] @ List.map navitem [
     ("Forward", "_Forward", `GO_DOWN, Nav.forward_one, "Forward one command", "Down");
     ("Backward", "_Backward", `GO_UP, Nav.backward_one, "Backward one command", "Up");
-    ("Run to cursor", "Run to _cursor", `JUMP_TO, Nav.run_to_cursor, "Run to cursor", "Right");
+    ("Run to cursor", "Run to _cursor", `JUMP_TO, Nav.run_to_cursor, "Run to cursor", "Return");
     ("Run to end", "_Run to end", `GOTO_BOTTOM, Nav.run_to_end, "Run to end", "End");
     ("Interrupt", "_Interrupt", `STOP, Nav.interrupt, "Interrupt computations", "Break");
     ("Reset", "_Reset", `GOTO_TOP, Nav.restart, "Reset Coq", "Home");

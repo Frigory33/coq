@@ -70,7 +70,7 @@ let init () =
 \n    <separator/>\
 \n    <menuitem action='Zoom in' />\
 \n    <menuitem action='Zoom out' />\
-\n    <menuitem action='Zoom fit' />\
+\n    <menuitem action='Zoom 100' />\
 \n    <separator/>\
 \n    <menuitem action='Show Toolbar' />\
 \n    <menuitem action='Query Pane' />\
