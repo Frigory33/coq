@@ -99,7 +99,7 @@ type parameter_kind =
     String_param of string string_param
   | List_param of (unit -> <box: GObj.widget ; apply : unit>)
   | Bool_param of bool_param
-  | Text_param of string string_param
+  (*| Text_param of string string_param*)
   | Combo_param of combo_param
   | Custom_param of custom_param
   | Modifiers_param of modifiers_param

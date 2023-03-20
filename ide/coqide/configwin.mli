@@ -150,6 +150,16 @@ val modifiers : ?editable: bool -> ?expand: bool -> ?help: string ->
 *)
 val custom : ?label: string -> GPack.box -> (unit -> unit) -> bool -> parameter_kind
 
+(** {2 Utility for modifier configuration} *)
+
+(** The list of all modifiers that may be used for configuration *)
+val all_modifiers : Gdk.Tags.modifier list
+
+(** The string representation of a modifier for use in the preferences dialog
+   @param modifier the modifier
+*)
+val string_of_modifier : Gdk.Tags.modifier -> string
+
 (** {2 Functions creating configuration windows and boxes} *)
 
 (** This function takes a configuration structure and creates a window
@@ -163,5 +173,6 @@ val edit :
   ?parent:GWindow.window ->
   ?width:int ->
   ?height:int ->
+  ?current_section:int list option ref ->
   configuration_structure list ->
   return_button

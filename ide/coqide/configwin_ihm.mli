@@ -65,6 +65,7 @@ val edit :
   ?parent:GWindow.window ->
   ?width:int ->
   ?height:int ->
+  ?current_section:int list option ref ->
   configuration_structure list ->
   return_button
 

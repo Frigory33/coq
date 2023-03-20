@@ -46,8 +46,22 @@ let combo = Configwin_ihm.combo
 let custom = Configwin_ihm.custom
 let modifiers = Configwin_ihm.modifiers
 
+let all_modifiers = [`CONTROL; `SHIFT; `META; `MOD1; `MOD2; `MOD3; `MOD4; `MOD5]
+
+(* How the modifiers are named in the preference box *)
+let string_of_modifier = function
+  | `CONTROL -> "<ctrl>"
+  | `SHIFT -> "<shft>"
+  | `META -> if Coq_config.arch = "Darwin" then "<cmd>" else "<meta>"
+  | `MOD1 -> "<alt>"
+  | `MOD2 -> "<mod2>"
+  | `MOD3 -> "<mod3>"
+  | `MOD4 -> "<mod4>"
+  | `MOD5 -> "<mod5>"
+  | _  -> ""
+
 let edit
     ?(apply=(fun () -> ()))
-    title ?parent ?width ?height
+    title ?parent ?width ?height ?(current_section = ref None)
     conf_struct_list =
-  Configwin_ihm.edit ~with_apply: true ~apply title ?parent ?width ?height conf_struct_list
+  Configwin_ihm.edit ~with_apply: true ~apply title ?parent ?width ?height ~current_section conf_struct_list

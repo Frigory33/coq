@@ -25,11 +25,20 @@
 
 (** Module containing the messages of Configwin.*)
 
-let mAdd = "Add";;
-let mRemove = "Remove";;
-let mUp = "Up";;
-let mEdit = "Edit";;
-let mOk = "Ok";;
-let mCancel = "Cancel";;
-let mApply = "Apply";;
+let software = "Configwin";;
+let version = "1.2";;
+
+let html_config = "Configwin bindings configurator for html parameters"
+
+let home = Option.default "" (Glib.get_home_dir ())
+
+let mCapture = "Capture"
+let mType_key = "Type key"
+let mAdd = `ADD
+let mRemove = `REMOVE
+let mUp = `GO_UP
+let mEdit = `EDIT
+let mOk = `OK
+let mCancel = `CANCEL
+let mApply = `APPLY
 let mValue = "Value"

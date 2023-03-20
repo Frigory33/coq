@@ -366,6 +366,7 @@ class custom_param_box param =
       None -> param.custom_box#coerce
     | Some l ->
         let wf = GBin.frame ~label: l () in
+        param.custom_box#set_border_width 4;
         wf#add param.custom_box#coerce;
         wf#coerce
   in
@@ -374,6 +375,7 @@ class custom_param_box param =
     method apply = param.custom_f_apply ()
   end
 
+(*
 (** This class is used to build a box for a text parameter.*)
 class text_param_box param =
   let _ = dbg "text_param_box" in
@@ -414,6 +416,7 @@ class text_param_box param =
       else
         ()
   end ;;
+*)
 
 (** This class is used to build a box for a boolean parameter.*)
 class bool_param_box param =
@@ -446,15 +449,19 @@ class modifiers_param_box param =
   let wev = GBin.event_box ~packing: (hbox#pack ~expand:true ~fill:true ~padding: 2) () in
   let _wl = GMisc.label ~text: param.md_label ~packing: wev#add () in
   let value = ref param.md_value in
-  let _ = List.map (fun modifier ->
-                      let but = GButton.toggle_button
-                                  ~label:(modifiers_to_string [modifier])
-                                  ~active:(List.mem modifier param.md_value)
-                                  ~packing:(hbox#pack ~expand:false) () in
-                      ignore (but#connect#toggled
-                                ~callback:(fun _ -> if but#active then value := modifier::!value
-                                 else value := List.filter ((<>) modifier) !value)))
-            param.md_allow
+  let () = List.iter
+    (fun modifier ->
+      let but = GButton.toggle_button
+        ~label:(modifiers_to_string [modifier])
+        ~active:(List.mem modifier param.md_value)
+        ~packing:(hbox#pack ~expand:false) () in
+      Option.iter but#set_tooltip_text param.md_help;
+      ignore (but#connect#toggled
+        ~callback:(fun _ ->
+          if but#active then value := modifier::!value
+          else value := List.filter ((<>) modifier) !value));
+    )
+    param.md_allow
   in
   let _ = set_help_tip wev param.md_help in
   object (self)
@@ -501,7 +508,7 @@ class ['a] list_param_box (param : 'a list_param) =
 *)
 
 (** This class creates a configuration box from a configuration structure *)
-class configuration_box conf_struct =
+class configuration_box conf_struct current_section =
 
   let main_box = GPack.hbox () in
 
@@ -539,10 +546,10 @@ class configuration_box conf_struct =
     let box = new combo_param_box p in
     let _ = main_box#pack ~expand: false ~padding: 2 box#box in
     box
-  | Text_param p ->
+  (*| Text_param p ->
     let box = new text_param_box p in
     let _ = main_box#pack ~expand: p.string_expand ~padding: 2 box#box in
-    box
+    box*)
   | Bool_param p ->
     let box = new bool_param_box p in
     let _ = main_box#pack ~expand: false ~padding: 2 box#box in
@@ -571,6 +578,7 @@ class configuration_box conf_struct =
   let rec make_tree iter conf_struct =
     (* box is not shown at first *)
     let box = GPack.vbox ~packing:(menu_box#pack ~expand:true) ~show:false () in
+    box#set_margin_left 4;
     let new_iter = match iter with
     | None -> tree#append ()
     | Some parent -> tree#append ~parent ()
@@ -609,32 +617,30 @@ class configuration_box conf_struct =
 
   let current_prop : widget option ref = ref None in
 
-  let select_iter iter =
+  let select_path path =
     let () = match !current_prop with
     | None -> ()
     | Some box -> box#box#misc#hide ()
     in
-    let box = tree#get ~row:iter ~column:box_col in
+    current_section := Some (Array.to_list (GTree.Path.get_indices path));
+    let box = tree#get ~row:(tree#get_iter path) ~column:box_col in
     let () = box#box#misc#show () in
     current_prop := Some box
   in
 
   let when_selected () =
-    let rows = selection#get_selected_rows in
-    match rows with
+    match selection#get_selected_rows with
     | [] -> ()
-    | row :: _ ->
-      let iter = tree#get_iter row in
-      select_iter iter
+    | row :: _ -> select_path row
   in
 
   (* Focus on a box when selected *)
-
   let _ = selection#connect#changed ~callback:when_selected in
 
-  let _ = match tree#get_iter_first with
-  | None -> ()
-  | Some iter -> select_iter iter
+  let () =
+    Option.iter (fun path ->
+        selection#select_path (GTree.Path.create path)
+      ) !current_section
   in
 
   object
@@ -654,7 +660,7 @@ class configuration_box conf_struct =
    to configure the various parameters. *)
 let edit ?(with_apply=true)
     ?(apply=(fun () -> ()))
-    title ?parent ?width ?height
+    title ?parent ?width ?height ?(current_section = ref None)
     conf_struct =
   let dialog = GWindow.dialog
     ~position:`CENTER
@@ -663,25 +669,21 @@ let edit ?(with_apply=true)
     ?parent ?height ?width
     ()
   in
-  let config_box = new configuration_box conf_struct in
+  let config_box = new configuration_box conf_struct current_section in
 
   let _ = dialog#vbox#pack ~expand:true config_box#box#coerce in
 
   if with_apply then
-    dialog#add_button Configwin_messages.mApply `APPLY;
+    dialog#add_button_stock Configwin_messages.mApply `APPLY;
+  dialog#add_button_stock Configwin_messages.mOk `OK;
+  dialog#add_button_stock Configwin_messages.mCancel `CANCEL;
 
-  dialog#add_button Configwin_messages.mOk `OK;
-  dialog#add_button Configwin_messages.mCancel `CANCEL;
-
-  let destroy () =
-    dialog#destroy ();
-  in
   let rec iter rep =
     try
       match dialog#run () with
         | `APPLY  -> config_box#apply; iter Return_apply
-        | `OK -> config_box#apply; destroy (); Return_ok
-        | _ -> destroy (); rep
+        | `OK -> config_box#apply; dialog#destroy (); Return_ok
+        | _ -> dialog#destroy (); rep
     with
         Failure s ->
           GToolbox.message_box ~title:"Error" s; iter rep
