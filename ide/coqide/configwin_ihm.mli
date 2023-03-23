@@ -25,37 +25,6 @@
 
 open Configwin_types
 
-val string : ?editable: bool -> ?expand: bool -> ?help: string ->
-  ?f: (string -> unit) -> string -> string -> parameter_kind
-val bool : ?editable: bool -> ?help: string ->
-  ?f: (bool -> unit) -> string -> bool -> parameter_kind
-(*
-val strings : ?editable: bool -> ?help: string ->
-  ?f: (string list -> unit) ->
-    ?eq: (string -> string -> bool) ->
-      ?add: (unit -> string list) ->
-        string -> string list -> parameter_kind
-val list : ?editable: bool -> ?help: string ->
-  ?f: ('a list -> unit) ->
-    ?eq: ('a -> 'a -> bool) ->
-      ?edit: ('a -> 'a) ->
-        ?add: (unit -> 'a list) ->
-          ?titles: string list ->
-            ?color: ('a -> string option) ->
-              string ->
-                ('a -> string list) ->
-                  'a list ->
-                    parameter_kind
-*)
-val combo : ?editable: bool -> ?expand: bool -> ?help: string ->
-  ?f: (string -> unit) ->
-    ?new_allowed: bool -> ?blank_allowed: bool ->
-      string -> string list -> string -> parameter_kind
-
-val modifiers : ?editable: bool -> ?expand: bool -> ?help: string ->
-  ?allow:(Gdk.Tags.modifier list) ->
-  ?f: (Gdk.Tags.modifier list -> unit) ->
-    string -> Gdk.Tags.modifier list -> parameter_kind
 val custom : ?label: string -> GPack.box -> (unit -> unit) -> bool -> parameter_kind
 
 val edit :
@@ -65,7 +34,7 @@ val edit :
   ?parent:GWindow.window ->
   ?width:int ->
   ?height:int ->
-  ?current_section:int list option ref ->
+  ?current_section:int array option ref ->
   configuration_structure list ->
   return_button
 

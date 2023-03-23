@@ -926,7 +926,7 @@ let configure ?(apply=(fun () -> ())) parent =
     in
     let () = text#misc#modify_font_by_name text_font#get in
     let _ = w#connect#activate ~callback:set_font in
-    custom ~label:"Fonts for text" box set_font true
+    custom ~label:"Text font" box set_font true
   | _ ->
     let box = GPack.hbox () in
     let w = GMisc.font_selection () in
@@ -936,7 +936,7 @@ let configure ?(apply=(fun () -> ())) parent =
     ignore (w#misc#connect#realize
               ~callback:(fun () -> w#set_font_name text_font#get));
     custom
-      ~label:"Fonts for text"
+      ~label:"Text font"
       box
       (fun () ->
          let fd =  w#font_name in
@@ -1045,24 +1045,25 @@ let configure ?(apply=(fun () -> ())) parent =
     custom ~label box callback true
   in
 
-  let config_editor = [
-      create_pref_section ~label:"Editor appearance" [
-          pbool "Dynamic word wrap" dynamic_word_wrap;
-          pbool "Show line number" show_line_number;
-          pbool "Show spaces" show_spaces;
-          pbool "Show right margin" show_right_margin;
-          pbool "Show progress bar" show_progress_bar;
-          pbool "Highlight current line" highlight_current_line;
-        ];
-      create_pref_section ~label:"Editor behavior" [
-          pbool "Auto indentation" auto_indent;
-          pbool "Insert spaces instead of tabs" spaces_instead_of_tabs;
-          pbool "Unicode binding completion" unicode_binding;
-          pbool "Auto completion" auto_complete;
-          pint "Delay (ms):" ~max:5000 auto_complete_delay;
-          pbool "Emacs/PG keybindings (μPG mode)" microPG;
-        ];
-    ]
+  let editor_appearance =
+    create_pref_section ~label:"Editor appearance" [
+        pbool "Dynamic word wrap" dynamic_word_wrap;
+        pbool "Show line number" show_line_number;
+        pbool "Show spaces" show_spaces;
+        pbool "Show right margin" show_right_margin;
+        pbool "Show progress bar" show_progress_bar;
+        pbool "Highlight current line" highlight_current_line;
+      ]
+  in
+  let editor_behavior =
+    create_pref_section ~label:"Editor behavior" [
+        pbool "Auto indentation" auto_indent;
+        pbool "Insert spaces instead of tabs" spaces_instead_of_tabs;
+        pbool "Unicode binding completion" unicode_binding;
+        pbool "Auto completion" auto_complete;
+        pint "Delay (ms):" ~max:5000 auto_complete_delay;
+        pbool "Emacs/PG keybindings (μPG mode)" microPG;
+      ]
   in
 
   let global_auto_revert =
@@ -1204,22 +1205,21 @@ let configure ?(apply=(fun () -> ())) parent =
   in
 *)
 
-(* ATTENTION !!!!! L'onglet Fonts doit etre en premier pour eviter un bug !!!!
-   (shame on Benjamin) *)
-  let cmds =
-    [Section("Fonts", Some `SELECT_FONT, [config_font]);
-     Section("Colors", Some `SELECT_COLOR,
-             [config_highlight; config_color]);
-     Section("Tags", Some `SELECT_COLOR, [config_tags]);
-     Section("Editor", Some `EDIT, config_editor);
-     Section("Files", Some `FLOPPY,
-             [file_format; global_auto_revert; auto_save]);
-     Section("Project", Some `PAGE_SETUP, [project_management]);
-     Section("Appearance", Some `PREFERENCES, [config_window]);
-     Section("Externals", Some `EXECUTE, [externals_cmds]);
-     Section("Shortcuts", Some `PREFERENCES,
-             [modifiers_valid; config_modifiers]);
-     Section("Misc", Some `ADD, [misc])]
+  let cmds = [
+      Section("Files", Some `FLOPPY, [file_format; global_auto_revert; auto_save], [
+          Section("Project", Some `PAGE_SETUP, [project_management], []);
+        ]);
+      Section("Editor", Some `EDIT, [editor_appearance; editor_behavior], [
+          Section("Font", Some `SELECT_FONT, [config_font], []);
+          Section("Colors", Some `SELECT_COLOR, [config_highlight; config_color], []);
+        ]);
+      Section("Appearance", Some `ZOOM_FIT, [config_window], [
+          Section("Tags", Some `SELECT_COLOR, [config_tags], []);
+        ]);
+      Section("Externals", Some `EXECUTE, [externals_cmds], []);
+      Section("Shortcuts", Some `MEDIA_FORWARD, [modifiers_valid; config_modifiers], []);
+      Section("Misc", Some `PREFERENCES, [misc], [])
+    ]
   in
 (*
   Format.printf "before edit: current.text_font = %s@." (Pango.Font.to_string current.text_font);

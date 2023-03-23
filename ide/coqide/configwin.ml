@@ -26,9 +26,8 @@
 type parameter_kind = Configwin_types.parameter_kind
 
 type configuration_structure =
-    Configwin_types.configuration_structure =
-    Section of string * GtkStock.id option * parameter_kind list
-  | Section_list of string * GtkStock.id option * configuration_structure list
+  Configwin_types.configuration_structure =
+  Section of string * GtkStock.id option * parameter_kind list * configuration_structure list
 
 type return_button =
     Configwin_types.return_button =
@@ -36,15 +35,7 @@ type return_button =
   | Return_ok
   | Return_cancel
 
-let string = Configwin_ihm.string
-(*
-let strings = Configwin_ihm.strings
-let list = Configwin_ihm.list
-*)
-let bool = Configwin_ihm.bool
-let combo = Configwin_ihm.combo
 let custom = Configwin_ihm.custom
-let modifiers = Configwin_ihm.modifiers
 
 let all_modifiers = [`CONTROL; `SHIFT; `META; `MOD1; `MOD2; `MOD3; `MOD4; `MOD5]
 
