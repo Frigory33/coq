@@ -338,10 +338,10 @@ let check_quit ?parent saveall =
    with e -> flash_info ("Cannot save preferences (" ^ Printexc.to_string e ^ ")"));
   let is_modified sn = sn.buffer#modified in
   if List.exists is_modified notebook#pages then begin
-    let answ = Configwin_ihm.question_box ~title:"Quit"
-      ~buttons:["Save Named Buffers and Quit";
-                "Quit without Saving";
-                "Don't Quit"]
+    let answ = Preferences_ui.question_box ~title:"Quit"
+      ~buttons:[ButtonUseString "Save named buffers and quit";
+                ButtonUseString "Quit without saving";
+                ButtonUseStock `CANCEL]
       ~default:0
       ~icon:(warn_image ())#coerce
       ?parent
@@ -470,10 +470,10 @@ let close_buffer ?parent sn =
   in
   if not sn.buffer#modified then do_remove ()
   else
-    let answ = Configwin_ihm.question_box ~title:"Close"
-      ~buttons:["Save Buffer and Close";
-                "Close without Saving";
-                "Don't Close"]
+    let answ = Preferences_ui.question_box ~title:"Close"
+      ~buttons:[ButtonUseString "Save buffer and close";
+                ButtonUseString "Close without saving";
+                ButtonUseStock `CANCEL]
       ~default:0
       ~icon:(warn_image ())#coerce
       ?parent
@@ -1459,7 +1459,7 @@ let build_ui () =
     item "Preferences" ~accel:"<Primary>comma" ~stock:`PREFERENCES
       ~callback:(fun _ ->
         begin
-          try Preferences.configure ~apply:refresh_notebook_pos w
+          try Preferences_ui.configure ~apply:refresh_notebook_pos w
           with e ->
             flash_info ("Editing preferences failed (" ^ Printexc.to_string e ^ ")")
         end;

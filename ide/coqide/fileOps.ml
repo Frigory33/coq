@@ -72,11 +72,11 @@ object(self)
       | Some f ->
         if not buffer#modified then do_revert f
         else
-          let answ = Configwin_ihm.question_box
+          let answ = Preferences_ui.question_box
             ~title:"Modified buffer changed on disk"
-            ~buttons:["Revert from File";
-                      "Overwrite File";
-                      "Disable Auto Revert"]
+            ~buttons:[ButtonUseStock `REVERT_TO_SAVED;
+                      ButtonUseString "Overwrite file";
+                      ButtonUseString "Disable Auto Revert"]
             ~default:0
             ~icon:(stock_to_widget `DIALOG_WARNING)
             ?parent
@@ -106,8 +106,8 @@ object(self)
   method saveas ?parent f =
   if not (Sys.file_exists f) then self#save f
   else
-    let answ = Configwin_ihm.question_box ~title:"File exists on disk"
-      ~buttons:["Overwrite"; "Cancel";]
+    let answ = Preferences_ui.question_box ~title:"File exists on disk"
+      ~buttons:[ButtonUseString "Overwrite"; ButtonUseStock `CANCEL]
       ~default:1
       ~icon:(warn_image ())#coerce
       ?parent

@@ -50,6 +50,17 @@ val list_tags : unit -> tag preference Util.String.Map.t
 val get_unicode_bindings_local_file : unit -> string option
 val get_unicode_bindings_default_file : unit -> string option
 
+val str_to_mod_list : string -> Gdk.Tags.modifier list
+val mod_list_to_str : Gdk.Tags.modifier list -> string
+
+val string_of_inputenc : inputenc -> string
+val inputenc_of_string : string -> inputenc
+
+val line_end_to_string : line_ending -> string
+val line_end_of_string : string -> line_ending
+
+val string_of_project_behavior : project_behavior -> string
+val project_behavior_of_string : string -> project_behavior
 
 val cmd_coqtop : string option preference
 val cmd_coqc : string preference
@@ -91,6 +102,8 @@ val opposite_tabs : bool preference
 (* val background_color : string preference *)
 val processing_color : string preference
 val processed_color : string preference
+val incompletely_processed_color : string preference
+val breakpoint_color : string preference
 val db_stopping_point_color : string preference
 val error_color : string preference
 val error_fg_color : string preference
@@ -109,8 +122,6 @@ val diffs : string preference
 
 val save_pref : unit -> unit
 val load_pref : warn:(delay:int -> string -> unit) -> unit
-
-val configure : ?apply:(unit -> unit) -> GWindow.window -> unit
 
 val stick : 'a preference ->
   < connect : #GObj.widget_signals ; .. > -> ('a -> unit) -> unit
