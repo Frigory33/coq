@@ -52,6 +52,7 @@ let init () =
     <menuitem action='Undo' />
     <menuitem action='Redo' />
     <separator />
+    <menuitem action='Select All' />
     <menuitem action='Cut' />
     <menuitem action='Copy' />
     <menuitem action='Paste' />

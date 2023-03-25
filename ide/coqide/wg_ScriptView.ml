@@ -361,6 +361,9 @@ object (self)
     } in
     Gobject.set prop obj show
 
+  method select_all () =
+    self#buffer#select_range self#buffer#start_iter self#buffer#end_iter
+
   method comment () =
     let rec get_line_start iter =
       if iter#starts_line then iter
