@@ -629,4 +629,4 @@ let build_layout (sn:session) =
     end
   in
   let () = sn.control <- control in
-  (Some session_tab#coerce,None,debugger_paned#coerce)
+  Some session_tab#coerce, None, debugger_paned#coerce

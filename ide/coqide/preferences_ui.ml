@@ -220,7 +220,8 @@ let create_pref_section ?(in_grid = false) label pref_data =
   let add_row =
     let create_label pref_data packing =
       if pref_data.text <> "" then
-        let label = GMisc.label ~text:pref_data.text ~xalign:0. ~packing () in
+        let label = GMisc.label ~text:pref_data.text ~packing () in
+        label#set_halign `START;
         Option.iter label#set_tooltip_text pref_data.tooltip;
     in
     if in_grid then
@@ -287,7 +288,6 @@ let create_pref_section ?(in_grid = false) label pref_data =
             ~packing:hbox#pack () in
           ignore (but#connect#toggled ~callback:(fun () ->
               if but#active then (
-                (* Mods must be sorted in value *)
                 value := str_to_mod_list (mod_list_to_str (modifier :: !value));
               ) else value := List.filter ((<>) modifier) !value;
               Option.iter (fun callback -> callback !value) callback;
@@ -470,18 +470,15 @@ let configure ?(apply = fun () -> ()) parent =
       ~border_width:4
       ~packing:(box#pack ~expand:true) ()
     in
-    let reset_button = GButton.button
-      ~label:"Reset"
-      ~packing:box#pack ()
-    in
+    let reset_button = GButton.button ~label:"Reset" ~packing:box#pack () in
     let apply_list = ref [] in
-    let _ = GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) () in
-    let _ = GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) () in
+    let _ =
+      GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) (),
+      GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) ()
+    in
     let iter i (text, prefs) =
       let top = i + 1 in
-      let _ = GMisc.label
-        ~text ~xalign:0. ~packing:(grid#attach ~left:0 ~top) ()
-      in
+      (GMisc.label ~text ~packing:(grid#attach ~left:0 ~top) ())#set_halign `START;
       List.iteri (fun i pref ->
         let button = GButton.color_button
           ~color:(Gdk.Color.color_parse pref#get)
@@ -573,9 +570,7 @@ let configure ?(apply = fun () -> ()) parent =
     let i = ref 0 in
     let cb = ref [] in
     let iter text tag =
-      let _ = GMisc.label
-        ~text ~xalign:0. ~packing:(grid#attach (*~expand:`X*) ~left:0 ~top:!i) ()
-      in
+      (GMisc.label ~text ~packing:(grid#attach ~left:0 ~top:!i) ())#set_halign `START;
       let button = tag_button () in
       let callback () = tag#set button#tag in
       button#set_tag tag#get;

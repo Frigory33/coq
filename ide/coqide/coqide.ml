@@ -347,7 +347,7 @@ let check_quit ?parent saveall =
       ~default:0
       ~icon:(warn_image ())#coerce
       ?parent
-      "There are unsaved buffers"
+      "There are unsaved buffers."
     in
     match answ with
       | 1 -> saveall ()
@@ -1416,8 +1416,8 @@ let build_ui () =
 
   menu file_menu [
     item "File" ~label:"_File";
-    item "New" ~callback:File.newfile ~stock:`NEW;
-    item "Open" ~callback:(File.load ~parent:w) ~stock:`OPEN;
+    item "New" ~callback:File.newfile ~stock:`NEW ~tooltip:"New buffer";
+    item "Open" ~callback:(File.load ~parent:w) ~stock:`OPEN ~tooltip:"Open file";
     item "Save" ~callback:(File.save ~parent:w) ~stock:`SAVE ~tooltip:"Save current buffer";
     item "Save as" ~stock:`SAVE_AS ~callback:(File.saveas ~parent:w);
     item "Save all" ~label:"Sa_ve all" ~callback:File.saveall;
@@ -1518,7 +1518,7 @@ let build_ui () =
         radio "Set diff" 1 ~label:"Show diffs: only _added";
         radio "Set removed diff" 2 ~label:"Show diffs: added and _removed";
       ];
-    item "Show Proof Diffs" ~label:"_Show Proof (with diffs, if set)" ~accel:("F8")
+    item "Show Proof Diffs" ~label:"_Show Proof (with diffs, if set)" ~accel:"<Shift>F2"
       ~callback:MiscMenu.show_proof_diffs;
   ];
   toggle_items view_menu Coq.PrintOpt.bool_items;
@@ -1533,7 +1533,7 @@ let build_ui () =
   ] @ List.map navitem [
     ("Forward", "_Forward", `GO_DOWN, Nav.forward_one, "Forward one command", "Down");
     ("Backward", "_Backward", `GO_UP, Nav.backward_one, "Backward one command", "Up");
-    ("Run to cursor", "Run to _cursor", `JUMP_TO, Nav.run_to_cursor, "Run to cursor", "Return");
+    ("Run to cursor", "Run to _cursor", `JUMP_TO, Nav.run_to_cursor, "Run to cursor", "Right");
     ("Run to end", "_Run to end", `GOTO_BOTTOM, Nav.run_to_end, "Run to end", "End");
     ("Interrupt", "_Interrupt", `STOP, Nav.interrupt, "Interrupt computations", "Break");
     ("Reset", "_Reset", `GOTO_TOP, Nav.restart, "Reset Coq", "Home");
@@ -1543,7 +1543,7 @@ let build_ui () =
           toggle_proof_visibility sess.buffer sess.analyzed_view#get_insert), "Hide proof", "h"); *)
     ("Previous", "_Previous", `GO_BACK, Nav.previous_occ, "Previous occurrence", "less");
     ("Next", "_Next", `GO_FORWARD, Nav.next_occ, "Next occurrence", "greater");
-    ("Force", "_Force", `EXECUTE, Nav.join_document, "Fully check the document", "f");
+    ("Force", "_Force", `EXECUTE, Nav.join_document, "Fully check the document", "Return");
   ] end;
 
   menu templates_menu [
@@ -1579,13 +1579,13 @@ let build_ui () =
 
   menu tools_menu [
     item "Tools" ~label:"_Tools";
-    item "Comment" ~label:"_Comment" ~accel:"<CTRL>D"
+    item "Comment" ~label:"_Comment" ~accel:"<Primary>D"
       ~callback:(cb_on_current_term (fun t -> t.script#comment ()));
-    item "Uncomment" ~label:"_Uncomment" ~accel:"<CTRL><SHIFT>D"
+    item "Uncomment" ~label:"_Uncomment" ~accel:"<Primary><Shift>D"
       ~callback:(cb_on_current_term (fun t -> t.script#uncomment ()));
     item "Coqtop arguments" ~label:"Coqtop _arguments"
       ~callback:MiscMenu.coqtop_arguments;
-    item "LaTeX-to-unicode" ~label:"_LaTeX-to-unicode" ~accel:"<Shift>space"
+    item "LaTeX-to-unicode" ~label:"_LaTeX-to-unicode" ~accel:"<Primary>space"
       ~callback:MiscMenu.apply_unicode_binding;
   ];
 

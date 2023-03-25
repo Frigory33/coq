@@ -11,38 +11,28 @@
 class ['a] typed_notebook make_page kill_page nb =
 object(self)
   inherit GPack.notebook nb as super
+
   val mutable term_list = []
 
-  method append_term (term:'a) =
-    let tab_label,menu_label,page = make_page term in
-      (* XXX - Temporary hack to compile with archaic lablgtk *)
-    ignore (super#append_page ?tab_label ?menu_label page);
+  method private add_term adder (term: 'a) =
+    let tab_label, menu_label, page = make_page term in
+    (* XXX - Temporary hack to compile with archaic lablgtk *)
+    let _ = adder ?tab_label ?menu_label page in
+    super#set_tab_reorderable page true;
     let real_pos = super#page_num page in
-    let lower,higher = Util.List.chop real_pos term_list in
-      term_list <- lower@[term]@higher;
-      real_pos
-(* XXX - Temporary hack to compile with archaic lablgtk
-  method insert_term ?(build=default_build) ?pos (term:'a) =
-    let tab_label,menu_label,page = build term in
-    let real_pos = super#insert_page ?tab_label ?menu_label ?pos page in
-    let lower,higher = Util.List.chop real_pos term_list in
-      term_list <- lower@[term]@higher;
-      real_pos
- *)
-  method prepend_term (term:'a) =
-    let tab_label,menu_label,page = make_page term in
-      (* XXX - Temporary hack to compile with archaic lablgtk *)
-    ignore (super#prepend_page ?tab_label ?menu_label page);
-    let real_pos = super#page_num page in
-    let lower,higher = Util.List.chop real_pos term_list in
-      term_list <- lower@[term]@higher;
-      real_pos
+    let lower, higher = Util.List.chop real_pos term_list in
+    term_list <- lower @ [term] @ higher;
+    real_pos
+
+  method append_term = self#add_term super#append_page
+  method prepend_term = self#add_term super#prepend_page
+  method insert_term ?pos = self#add_term (super#insert_page ?pos)
 
   method set_term (term:'a) =
-    let tab_label,menu_label,page = make_page term in
+    let tab_label, menu_label, page = make_page term in
     let real_pos = super#current_page in
-      term_list <- Util.List.map_i (fun i x -> if i = real_pos then term else x) 0 term_list;
-      super#set_page ?tab_label ?menu_label page
+    term_list <- Util.List.map_i (fun i x -> if i = real_pos then term else x) 0 term_list;
+    super#set_page ?tab_label ?menu_label page;
 
   method get_nth_term i =
     List.nth term_list i
