@@ -62,6 +62,10 @@ val line_end_of_string : string -> line_ending
 val string_of_project_behavior : project_behavior -> string
 val project_behavior_of_string : string -> project_behavior
 
+val print_opt_item_names : string list ref
+
+val select_arch : 'a -> 'a -> 'a
+
 val cmd_coqtop : string option preference
 val cmd_coqc : string preference
 val cmd_make : string preference
@@ -97,8 +101,7 @@ val auto_complete_delay : int preference
 val stop_before : bool preference
 val reset_on_tab_switch : bool preference
 val line_ending : line_ending preference
-val vertical_tabs : bool preference
-val opposite_tabs : bool preference
+val document_tabs_pos : string preference
 (* val background_color : string preference *)
 val processing_color : string preference
 val processed_color : string preference

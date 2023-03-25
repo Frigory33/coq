@@ -301,7 +301,7 @@ described below in :ref:`character-encoding-saved-files`.
 The `Externals` section allows customizing the external commands for
 compilation, printing, web browsing. In the browser command, you may
 use `%s` to denote the URL to open, for example:
-`firefox -remote "OpenURL(%s)"`.
+`firefox %s`.
 
 `Shortcuts`
 

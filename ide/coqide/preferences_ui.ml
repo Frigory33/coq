@@ -146,11 +146,16 @@ let edit_preferences
   dialog#add_button_stock `OK `OK;
   dialog#add_button_stock `CANCEL `CANCEL;
 
+  let apply () =
+    preferences_box.apply ();
+    apply ();
+  in
+
   let rec iter rep =
     try
       match dialog#run () with
-        | `APPLY  -> preferences_box.apply (); iter Preferences_Apply
-        | `OK -> preferences_box.apply (); dialog#destroy (); Preferences_OK
+        | `APPLY  -> apply (); iter Preferences_Apply
+        | `OK -> apply (); dialog#destroy (); Preferences_OK
         | _ -> dialog#destroy (); rep
     with exc ->
       GToolbox.message_box ~title:"Error"
@@ -166,8 +171,12 @@ type pref_ui_specific_info =
 | PInt of { min: int; max: int; pref: int preference }
 | PTextExpr of { initial: string; set: (string -> unit) }
 | PCombo of { values: string list; editable: bool; initial: string; set: (int -> string -> unit) }
-| PModifiers of { allowed_get: unit -> Gdk.Tags.modifier list;
-    registerer: ((unit -> unit) -> unit) option; callback: (unit -> unit) option; pref: string preference }
+| PModifiers of {
+    allowed_mods: Gdk.Tags.modifier list;
+    registerer: ((Gdk.Tags.modifier list -> unit) -> unit) option;
+    callback: (Gdk.Tags.modifier list -> unit) option;
+    pref: string preference
+  }
 
 type pref_ui_info = {
   text: string;
@@ -178,7 +187,7 @@ type pref_ui_info = {
 let string_of_modifier = function
   | `CONTROL -> "<ctrl>"
   | `SHIFT -> "<shift>"
-  | `META -> if Coq_config.arch = "Darwin" then "<cmd>" else "<meta>"
+  | `META -> select_arch "<meta>" "<cmd>"
   | `MOD1 -> "<alt>"
   | `MOD2 -> "<mod2>"
   | `MOD3 -> "<mod3>"
@@ -187,6 +196,11 @@ let string_of_modifier = function
   | _  -> ""
 
 let all_modifiers = [`CONTROL; `SHIFT; `META; `MOD1; `MOD2; `MOD3; `MOD4; `MOD5]
+
+let rec find_index_opt elem ?(i = 0) = function
+  | [] -> None
+  | h :: _ when h = elem -> Some i
+  | _ :: t -> find_index_opt elem ~i:(succ i) t
 
 let pbool text ?tooltip pref = { text; tooltip; specific = PBool { pref } }
 let pint text ?tooltip ?(min = 0) ?(max = 999_999_999) pref =
@@ -197,11 +211,12 @@ let pcombo text ?tooltip values ?(editable = false) initial set =
   { text; tooltip; specific = PCombo { values; editable; initial; set } }
 let pstringcombo text ?tooltip values ?(editable = false) pref =
   pcombo text ?tooltip values ~editable pref#get (fun _ s -> pref#set s)
-let pmodifiers text ?tooltip allowed_get ?registerer ?callback pref =
-  { text; tooltip; specific = PModifiers { allowed_get; registerer; callback; pref } }
+let pmodifiers text ?tooltip allowed_mods ?registerer ?callback pref =
+  { text; tooltip; specific = PModifiers { allowed_mods; registerer; callback; pref } }
 
 let create_pref_section ?(in_grid = false) label pref_data =
   let box = GPack.vbox () in
+  let apply_list = ref [] in
   let add_row =
     let create_label pref_data packing =
       if pref_data.text <> "" then
@@ -219,7 +234,6 @@ let create_pref_section ?(in_grid = false) label pref_data =
         create_label pref_data box#pack;
         (box#pack : (GObj.widget -> unit)))
   in
-
   let add_param index pref_data =
     let setup_input ?(expand = false) input =
       if not in_grid && pref_data.text <> "" then
@@ -230,7 +244,7 @@ let create_pref_section ?(in_grid = false) label pref_data =
     match pref_data.specific with
     | PBool { pref } ->
         let input = GButton.check_button ~label:pref_data.text ~active:pref#get ~packing:box#pack () in
-        ignore (input#connect#toggled ~callback:(fun () -> pref#set input#active));
+        apply_list := (fun () -> pref#set input#active) :: !apply_list;
     | PInt { min; max; pref } ->
         let packing = add_row pref_data index in
         let input = GEdit.spin_button
@@ -241,39 +255,29 @@ let create_pref_section ?(in_grid = false) label pref_data =
         let lower = float_of_int min and upper = float_of_int max in
         input#adjustment#set_bounds ~lower ~upper ~step_incr:1. ();
         input#set_value (float_of_int pref#get);
-        ignore (input#connect#value_changed ~callback:(fun () -> pref#set input#value_as_int));
+        apply_list := (fun () -> pref#set input#value_as_int) :: !apply_list;
     | PTextExpr { initial; set } ->
         let packing = add_row pref_data index in
         let input = GEdit.entry ~text:initial ~packing () in
         setup_input ~expand:true input;
-        ignore (input#connect#changed ~callback:(fun () -> set input#text));
+        apply_list := (fun () -> set input#text) :: !apply_list;
     | PCombo { values; editable; initial; set } when editable ->
         let packing = add_row pref_data index in
         let input, _ = GEdit.combo_box_entry_text ~strings:values ~packing () in
         input#entry#set_editable true;
         input#entry#set_text initial;
         setup_input ~expand:true input;
-        ignore (input#connect#changed ~callback:(fun () -> set input#active input#entry#text));
+        apply_list := (fun () -> set input#active input#entry#text) :: !apply_list;
     | PCombo { values; editable; initial; set } ->
         let packing = add_row pref_data index in
-        let active =
-          (let rec find_index i = function
-           | [] -> None
-           | h :: _ when h = initial -> Some i
-           | _ :: t -> find_index (succ i) t
-           in
-           find_index 0 values)
-        in
-        let input, _ = GEdit.combo_box_text ~strings:values ?active ~packing () in
+        let input, _ = GEdit.combo_box_text ~strings:values ?active:(find_index_opt initial values) ~packing () in
         setup_input input;
         let values = Array.of_list values in
-        let callback () = set input#active values.(input#active) in
-        ignore (input#connect#changed ~callback);
-    | PModifiers { allowed_get; registerer; callback; pref } ->
+        apply_list := (fun () -> set input#active values.(input#active)) :: !apply_list;
+    | PModifiers { allowed_mods; registerer; callback; pref } ->
         let packing = add_row pref_data index in
         let hbox = GPack.hbox ~packing () in
         setup_input hbox;
-        let allowed_mods = allowed_get () in
         let filter_mods allowed = List.filter (fun modifier -> List.mem modifier allowed) in
         let value = ref (filter_mods allowed_mods (str_to_mod_list pref#get)) in
         let create_button modifier =
@@ -281,27 +285,26 @@ let create_pref_section ?(in_grid = false) label pref_data =
             ~label:(string_of_modifier modifier)
             ~active:(List.mem modifier !value)
             ~packing:hbox#pack () in
-          ignore (but#connect#toggled
-            ~callback:(fun _ ->
-              if but#active then value := modifier::!value
-              else value := List.filter ((<>) modifier) !value;
-              pref#set (mod_list_to_str !value);
-              Option.iter (fun callback -> callback ()) callback;
-            )
-          );
+          ignore (but#connect#toggled ~callback:(fun () ->
+              if but#active then (
+                (* Mods must be sorted in value *)
+                value := str_to_mod_list (mod_list_to_str (modifier :: !value));
+              ) else value := List.filter ((<>) modifier) !value;
+              Option.iter (fun callback -> callback !value) callback;
+            ));
+          apply_list := (fun () -> pref#set (mod_list_to_str !value)) :: !apply_list;
         in
         List.iter create_button allowed_mods;
         Option.iter (fun registerer ->
-            registerer (fun () ->
+            registerer (fun allowed_mods ->
               List.iter hbox#remove hbox#children;
-              let allowed_mods = allowed_get () in
               value := filter_mods allowed_mods !value;
               List.iter create_button allowed_mods;
-            )
+            );
           ) registerer;
   in
   List.iteri add_param pref_data;
-  { label; box; apply = fun () -> () }
+  { label; box; apply = fun () -> List.iter (fun apply -> apply ()) !apply_list }
 
 class tag_button (box : Gtk.box Gtk.obj) =
 object (self)
@@ -382,136 +385,25 @@ let tag_button () =
 let current_section = ref None
 
 let configure ?(apply = fun () -> ()) parent =
-  let config_font =
-    let preview_text = "Goal (∃n : nat, n ≤ 0)∧(∀x,y,z, x∈y⋃z↔x∈y∨x∈z)." in
-    match Coq_config.arch with
-    | "Darwin" ->
-      (* A poor man's font selection. Work around #16136, which is ultimately a GTK bug. *)
-      let box = GPack.vbox () in
-      box#set_height_request 200;
-      box#set_height_request 300;
-      let font_sel = GEdit.entry ~text:text_font#get () in
-      box#pack ~expand:false font_sel#coerce;
-      let text = GMisc.label ~text:preview_text () in
-      text#set_ypad 10;
-      box#pack ~expand:false text#coerce;
-      let set_font () =
-        let fd = GPango.font_description_from_string font_sel#text in
-        text_font#set fd#to_string;
-        text#misc#modify_font_by_name fd#to_string;
-        font_sel#set_text fd#to_string;
-      in
-      text#misc#modify_font_by_name text_font#get;
-      let _ = font_sel#connect#activate ~callback:set_font in
-      { label = "Text font"; box; apply = set_font }
-    | _ ->
-      let box = GPack.hbox () in
-      let font_sel = GMisc.font_selection () in
-      font_sel#set_preview_text preview_text;
-      box#pack ~expand:true font_sel#coerce;
-      let _ = font_sel#misc#connect#realize
-                ~callback:(fun () -> font_sel#set_font_name text_font#get) in
-      { label = "Text font"; box; apply = (fun () -> text_font#set font_sel#font_name) }
+  let file_format =
+    create_pref_section ~in_grid:true "File format" [
+      pcombo "File charset encoding:" ~editable:true
+        ("UTF-8" :: "LOCALE" :: match encoding#get with Emanual s -> [s] | _ -> [])
+        (string_of_inputenc encoding#get)
+        (fun _ s -> encoding#set (inputenc_of_string s));
+      pcombo "EOL character:" ["Default"; {|Linux (\n)|}; {|Windows (\r\n)|}]
+        (line_end_to_string line_ending#get)
+        (fun _ s -> line_ending#set (line_end_of_string s));
+    ]
   in
 
-  let config_highlight =
-    let source_param text ids elem_get pref =
-      let id_to_name id =
-        match elem_get id with
-        | Some elem -> elem#name
-        | None -> ""
-      in
-      let names = List.map id_to_name ids in
-      let ids = Array.of_list ids in
-      pcombo text names (id_to_name pref#get) (fun i _ -> pref#set ids.(i))
-    in
-    create_pref_section ~in_grid:true "Highlight configuration" [
-        source_param "Style scheme:" style_manager#style_scheme_ids
-          style_manager#style_scheme source_style;
-        source_param "Language:"
-          (List.filter (String.starts_with ~prefix:"coq") lang_manager#language_ids)
-          lang_manager#language source_language;
-      ]
-  in
-
-  let config_color =
-    let box = GPack.vbox () in
-    let grid = GPack.grid
-      ~row_spacings:5
-      ~col_spacings:5
-      ~border_width:4
-      ~packing:(box#pack ~expand:true) ()
-    in
-    let reset_button = GButton.button
-      ~label:"Reset"
-      ~packing:box#pack ()
-    in
-    let _ = GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) () in
-    let _ = GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) () in
-    let iter i (text, prefs) =
-      let top = i + 1 in
-      let _ = GMisc.label
-        ~text ~xalign:0. ~packing:(grid#attach (*~expand:`X*) ~left:0 ~top) ()
-      in
-      List.iteri (fun i pref ->
-        let button = GButton.color_button
-          ~color:(Gdk.Color.color_parse pref#get)
-          ~packing:(grid#attach ~left:(i + 1) ~top) ()
-        in
-        let _ = button#connect#color_set ~callback:begin fun () ->
-          pref#set (Gdk.Color.color_to_string button#color)
-        end in
-        let reset _ =
-          pref#reset ();
-          button#set_color (Gdk.Color.color_parse pref#get)
-        in
-        let _ = reset_button#connect#clicked ~callback:reset in
-        ()) prefs;
-    in
-    let () = Util.List.iteri iter [
-      (*"Editor", [background_color]; *)
-      "Processed text", [processed_color];
-      "Text being processed", [processing_color];
-      "Incompletely processed Qed", [incompletely_processed_color];
-      "Breakpoints", [breakpoint_color];
-      "Debugger stopping point", [db_stopping_point_color];
-      "Errors", [error_color; error_fg_color];
-    ] in
-    let label = "Color configuration" in
-    { label; box; apply = (fun () -> ()) }
-  in
-
-  let config_tags =
-    let box = GPack.vbox () in
-    let scroll = GBin.scrolled_window
-      ~hpolicy:`NEVER
-      ~vpolicy:`AUTOMATIC
-      ~packing:(box#pack ~expand:true)
-      ()
-    in
-    let grid = GPack.grid
-      ~row_spacings:5
-      ~col_spacings:5
-      ~border_width:2
-      ~packing:scroll#add_with_viewport ()
-    in
-    let i = ref 0 in
-    let cb = ref [] in
-    let iter text tag =
-      let _ = GMisc.label
-        ~text ~xalign:0. ~packing:(grid#attach (*~expand:`X*) ~left:0 ~top:!i) ()
-      in
-      let button = tag_button () in
-      let callback () = tag#set button#tag in
-      button#set_tag tag#get;
-      grid#attach ~left:1 ~top:!i button#coerce;
-      incr i;
-      cb := callback :: !cb;
-    in
-    Util.String.Map.iter iter (list_tags ());
-    let label = "Tag configuration" in
-    let callback () = List.iter (fun f -> f ()) !cb in
-    { label; box; apply = callback }
+  let project_management =
+    create_pref_section "Project management" [
+        pstring "Default name for project file:" project_file_name;
+        pcombo "Project file options are" (List.map string_of_project_behavior [Subst_args; Append_args; Ignore_args])
+          (string_of_project_behavior read_project#get)
+          (fun _ s -> read_project#set (project_behavior_of_string s));
+      ];
   in
 
   let editor_appearance =
@@ -550,25 +442,70 @@ let configure ?(apply = fun () -> ()) parent =
     ]
   in
 
-  let file_format =
-    create_pref_section ~in_grid:true "File format" [
-      pcombo "File charset encoding:" ~editable:true
-        ("UTF-8" :: "LOCALE" :: match encoding#get with Emanual s -> [s] | _ -> [])
-        (string_of_inputenc encoding#get)
-        (fun _ s -> encoding#set (inputenc_of_string s));
-      pcombo "EOL character:" ["Default"; {|Linux (\n)|}; {|Windows (\r\n)|}]
-        (line_end_to_string line_ending#get)
-        (fun _ s -> line_ending#set (line_end_of_string s));
-    ]
+  let config_highlight =
+    let source_param text ids elem_get pref =
+      let id_to_name id =
+        match elem_get id with
+        | Some elem -> elem#name
+        | None -> ""
+      in
+      let names = List.map id_to_name ids in
+      let ids = Array.of_list ids in
+      pcombo text names (id_to_name pref#get) (fun i _ -> pref#set ids.(i))
+    in
+    create_pref_section ~in_grid:true "Highlight configuration" [
+        source_param "Style scheme:" style_manager#style_scheme_ids
+          style_manager#style_scheme source_style;
+        source_param "Language:"
+          (List.filter (CString.is_prefix "coq") lang_manager#language_ids)
+          lang_manager#language source_language;
+      ]
   in
 
-  let project_management =
-    create_pref_section "Project management" [
-        pstring "Default name for project file:" project_file_name;
-        pcombo "Project file options are" (List.map string_of_project_behavior [Subst_args; Append_args; Ignore_args])
-          (string_of_project_behavior read_project#get)
-          (fun _ s -> read_project#set (project_behavior_of_string s));
-      ];
+  let config_color =
+    let box = GPack.vbox () in
+    let grid = GPack.grid
+      ~row_spacings:5
+      ~col_spacings:5
+      ~border_width:4
+      ~packing:(box#pack ~expand:true) ()
+    in
+    let reset_button = GButton.button
+      ~label:"Reset"
+      ~packing:box#pack ()
+    in
+    let apply_list = ref [] in
+    let _ = GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) () in
+    let _ = GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) () in
+    let iter i (text, prefs) =
+      let top = i + 1 in
+      let _ = GMisc.label
+        ~text ~xalign:0. ~packing:(grid#attach ~left:0 ~top) ()
+      in
+      List.iteri (fun i pref ->
+        let button = GButton.color_button
+          ~color:(Gdk.Color.color_parse pref#get)
+          ~packing:(grid#attach ~left:(i + 1) ~top) ()
+        in
+        apply_list := (fun () -> pref#set (Gdk.Color.color_to_string button#color)) :: !apply_list;
+        let _ = reset_button#connect#clicked ~callback:(fun () ->
+            pref#reset ();
+            button#set_color (Gdk.Color.color_parse pref#get);
+          )
+        in
+        ()) prefs;
+    in
+    let () = Util.List.iteri iter [
+      (*"Editor", [background_color]; *)
+      "Processed text", [processed_color];
+      "Text being processed", [processing_color];
+      "Incompletely processed Qed", [incompletely_processed_color];
+      "Breakpoints", [breakpoint_color];
+      "Debugger stopping point", [db_stopping_point_color];
+      "Errors", [error_color; error_fg_color];
+    ] in
+    let label = "Color configuration" in
+    { label; box; apply = fun () -> List.iter (fun apply -> apply ()) !apply_list }
   in
 
   let config_window =
@@ -577,23 +514,113 @@ let configure ?(apply = fun () -> ()) parent =
       pint "Height at startup:" window_height;
     ]
   in
+  let config_document_tabs =
+    create_pref_section "Document tabs" [
+        let positions = ["top"; "left"; "right"; "bottom"] in
+        let labels = ["Top"; "Left"; "Right"; "Bottom"] in
+        let initial = List.nth labels (match find_index_opt document_tabs_pos#get positions with Some i -> i | _ -> 0) in
+        let setter i _ = document_tabs_pos#set (List.nth positions i) in
+        pcombo "Position:" labels initial setter;
+      ]
+  in
+
+  let config_font =
+    let preview_text = "Goal (∃n : nat, n ≤ 0)∧(∀x,y,z, x∈y⋃z↔x∈y∨x∈z)." in
+    select_arch (
+      let box = GPack.hbox () in
+      let font_sel = GMisc.font_selection ~preview_text:preview_text () in
+      let realized = ref false in (* The font selector does not allow setting its font before it is realized (bug) *)
+      box#pack ~expand:true font_sel#coerce;
+      let _ = font_sel#misc#connect#realize
+                ~callback:(fun () -> font_sel#set_font_name text_font#get; realized := true;) in
+      { label = "Text font"; box; apply = (fun () -> if !realized then text_font#set font_sel#font_name;) }
+    ) (
+      (* For Darwin: a poor man's font selection. Work around #16136, which is ultimately a GTK bug. *)
+      let box = GPack.vbox () in
+      box#set_height_request 200;
+      box#set_height_request 300;
+      let font_sel = GEdit.entry ~text:text_font#get () in
+      box#pack ~expand:false font_sel#coerce;
+      let text = GMisc.label ~text:preview_text () in
+      text#set_ypad 10;
+      box#pack ~expand:false text#coerce;
+      let set_font () =
+        let fd = GPango.font_description_from_string font_sel#text in
+        text_font#set fd#to_string;
+        text#misc#modify_font_by_name fd#to_string;
+        font_sel#set_text fd#to_string;
+      in
+      text#misc#modify_font_by_name text_font#get;
+      let _ = font_sel#connect#activate ~callback:set_font in
+      { label = "Text font"; box; apply = set_font }
+    )
+  in
+
+  let config_tags =
+    let box = GPack.vbox () in
+    let scroll = GBin.scrolled_window
+      ~hpolicy:`NEVER
+      ~vpolicy:`AUTOMATIC
+      ~packing:(box#pack ~expand:true)
+      ()
+    in
+    let grid = GPack.grid
+      ~row_spacings:5
+      ~col_spacings:5
+      ~border_width:2
+      ~packing:scroll#add_with_viewport ()
+    in
+    let i = ref 0 in
+    let cb = ref [] in
+    let iter text tag =
+      let _ = GMisc.label
+        ~text ~xalign:0. ~packing:(grid#attach (*~expand:`X*) ~left:0 ~top:!i) ()
+      in
+      let button = tag_button () in
+      let callback () = tag#set button#tag in
+      button#set_tag tag#get;
+      grid#attach ~left:1 ~top:!i button#coerce;
+      incr i;
+      cb := callback :: !cb;
+    in
+    Util.String.Map.iter iter (list_tags ());
+    let label = "Tag configuration" in
+    let callback () = List.iter (fun f -> f ()) !cb in
+    { label; box; apply = callback }
+  in
+
+  let modifiers_valid_callbacks = ref [] in
+  let modifiers_reg callback =
+    modifiers_valid_callbacks := callback :: !modifiers_valid_callbacks
+  in
+  let allowed_mods = str_to_mod_list modifiers_valid#get in
+  let modifiers_valid =
+    create_pref_section "Allowed modifiers" [
+        pmodifiers "" all_modifiers ~callback:(fun value ->
+            List.iter (fun callback -> callback value) !modifiers_valid_callbacks;
+          ) modifiers_valid;
+      ]
+  in
+  let config_modifiers =
+    create_pref_section ~in_grid:true "Modifiers for menu item accelerators" [
+        pmodifiers "View:" allowed_mods ~registerer:modifiers_reg modifier_for_display;
+        pmodifiers "Navigation:" allowed_mods ~registerer:modifiers_reg modifier_for_navigation;
+        pmodifiers "Templates:" allowed_mods ~registerer:modifiers_reg modifier_for_templates;
+        pmodifiers "Queries:" allowed_mods ~registerer:modifiers_reg modifier_for_queries;
+        (* user_queries *)
+      ]
+  in
 
   let cmd_editor =
-    let predefined = ["emacs %s"; "vi %s"; "NOTEPAD %s"] in
+    let predefined = ["gedit %s"; "kate %s"; "emacs %s"; "vi %s"; "notepad %s"; "notepad++ %s"] in
     pstringcombo ~tooltip:"(%s for file name)" "External editor:" ~editable:true
-      (predefined @ [if List.mem cmd_editor#get predefined then "" else cmd_editor#get])
+      ((if List.mem cmd_editor#get predefined then [] else [cmd_editor#get]) @ predefined)
       cmd_editor
   in
   let cmd_browse =
-    let predefined = [
-      Coq_config.browser;
-      "netscape -remote \"openURL(%s)\"";
-      "mozilla -remote \"openURL(%s)\"";
-      "firefox -remote \"openURL(%s,new-windows)\" || firefox %s &";
-      "seamonkey -remote \"openURL(%s)\" || seamonkey %s &"
-    ] in
+    let predefined = [Coq_config.browser; "firefox %s &"; "seamonkey %s &"; "chromium %s &"] in
     pstringcombo ~tooltip:"(%s for url)" "Browser:" ~editable:true
-      (predefined @ [if List.mem cmd_browse#get predefined then "" else cmd_browse#get])
+      ((if List.mem cmd_browse#get predefined then [] else [cmd_browse#get]) @ predefined)
       cmd_browse
   in
   let externals_cmds =
@@ -611,35 +638,11 @@ let configure ?(apply = fun () -> ()) parent =
       ]
   in
 
-  let modifiers_valid_callbacks = ref [] in
-  let modifiers_reg callback =
-    modifiers_valid_callbacks := List.cons callback !modifiers_valid_callbacks
-  in
-  let allowed_mods_get () = str_to_mod_list modifiers_valid#get in
-  let modifiers_valid =
-    create_pref_section "Allowed modifiers" [
-        pmodifiers "" (fun () -> all_modifiers) ~callback:(fun () ->
-            List.iter (fun callback -> callback ()) !modifiers_valid_callbacks
-          ) modifiers_valid
-    ]
-  in
-  let config_modifiers =
-    create_pref_section ~in_grid:true "Modifiers for menu items accelerators" [
-        pmodifiers "View:" allowed_mods_get ~registerer:modifiers_reg modifier_for_display;
-        pmodifiers "Navigation:" allowed_mods_get ~registerer:modifiers_reg modifier_for_navigation;
-        pmodifiers "Templates:" allowed_mods_get ~registerer:modifiers_reg modifier_for_templates;
-        pmodifiers "Queries:" allowed_mods_get ~registerer:modifiers_reg modifier_for_queries;
-        (* user_queries *)
-      ]
-  in
-
   let misc =
-    create_pref_section "Miscellaneous (unimplemented?)" [
-      pbool "Stop interpreting before the current point" stop_before;
-      pbool "Reset coqtop on tab switch" reset_on_tab_switch;
-      pbool "Vertical tabs" vertical_tabs;
-      pbool "Tabs on opposite side" opposite_tabs;
-    ]
+    create_pref_section "Miscellaneous" [
+        pbool "Stop interpreting before the current point" stop_before;
+        pbool "Reset coqtop on tab switch" reset_on_tab_switch;
+      ]
   in
 
 (*
@@ -670,7 +673,6 @@ let configure ?(apply = fun () -> ()) parent =
       "User queries"
       (fun (q, s) -> [q; s])
       user_queries#get
-
   in
 *)
 
@@ -679,14 +681,14 @@ let configure ?(apply = fun () -> ()) parent =
           pref_category "Project" ~icon:`PAGE_SETUP [project_management];
         ];
       pref_category "Editor" ~icon:`EDIT [editor_appearance; editor_behavior] ~children:[
-          pref_category "Font" ~icon:`SELECT_FONT [config_font];
           pref_category "Colors" ~icon:`SELECT_COLOR [config_highlight; config_color];
         ];
-      pref_category "Appearance" ~icon:`ZOOM_FIT [config_window] ~children:[
+      pref_category "Appearance" ~icon:`ZOOM_FIT [config_window; config_document_tabs] ~children:[
+          pref_category "Font" ~icon:`SELECT_FONT [config_font];
           pref_category "Tags" ~icon:`SELECT_COLOR [config_tags];
         ];
-      pref_category "Externals" ~icon:`EXECUTE [externals_cmds];
       pref_category "Shortcuts" ~icon:`MEDIA_FORWARD [modifiers_valid; config_modifiers];
+      pref_category "Externals" ~icon:`EXECUTE [externals_cmds];
       pref_category "Misc" ~icon:`PREFERENCES [misc];
     ]
   in
@@ -726,7 +728,7 @@ let question_box ?parent ?icon ~title ?(buttons = []) ?(default = 1) message =
     );
   in
   iter_buttons 1 buttons;
-  let _ = window#connect#destroy ~callback: GMain.Main.quit in
+  let _ = window#connect#destroy ~callback:GMain.Main.quit in
   window#set_position `CENTER;
   window#show ();
   GMain.Main.main ();

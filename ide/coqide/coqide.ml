@@ -117,9 +117,12 @@ let make_coqtop_args fname =
         (* at initialization of coqtop (see #10286) *)
         (* If the file name is a valid identifier, use it as toplevel name; *)
         (* otherwise the default “Top” will be used. *)
-        match Unicode.ident_refutation (Filename.chop_extension (Filename.basename fname)) with
-        | Some _ -> args
-        | None -> "-topfile"::fname::args
+        try
+          match Unicode.ident_refutation (Filename.chop_extension (Filename.basename fname)) with
+          | Some _ -> args
+          | None -> "-topfile"::fname::args
+        with Invalid_argument _ ->
+          failwith "CoqIDE cannot open files which don't have an extension in their filename."
   in
   proj, args
 
@@ -130,16 +133,15 @@ let load_file_cb : (string -> unit) ref = ref ignore
 let drop_received context ~x ~y data ~info ~time =
   if data#format = 8 then begin
     let files = Str.split (Str.regexp "\r?\n") data#data in
-    let path = Str.regexp "^file://\\(.*\\)$" in
     List.iter (fun f ->
-      if Str.string_match path f 0 then
-        !load_file_cb (Str.matched_group 1 f)
+      let _, f = Glib.Convert.filename_from_uri f in
+      !load_file_cb f;
     ) files;
     context#finish ~success:true ~del:false ~time
   end else context#finish ~success:false ~del:false ~time
 
 let drop_targets = [
-  { Gtk.target = "text/uri-list"; Gtk.flags = []; Gtk.info = 0}
+  { Gtk.target = "text/uri-list"; Gtk.flags = []; Gtk.info = 0 }
 ]
 
 let set_drag (w : GObj.drag_ops) =
@@ -1226,17 +1228,18 @@ let show_hide_query_pane sn =
   let ccw = sn.command in
   if ccw#visible then ccw#hide else ccw#show
 
-let zoom_100 sn =
+let zoom_fit sn =
   let script = sn.script in
   let space = script#misc#allocation.Gtk.width in
   let cols = script#right_margin_position in
   let pango_ctx = script#misc#pango_context in
   let layout = pango_ctx#create_layout#as_layout in
-  let fsize = Pango.Font.get_size (Pango.Font.from_string text_font#get) in
   Pango.Layout.set_text layout (String.make cols 'X');
   let tlen = fst (Pango.Layout.get_pixel_size layout) in
-  Pango.Font.set_size (Pango.Font.from_string text_font#get)
-    (fsize * space / tlen / Pango.scale * Pango.scale);
+  let ft = Pango.Font.from_string text_font#get in
+  let fsize = Pango.Font.get_size ft in
+  Pango.Font.set_size ft (fsize * space / tlen / Pango.scale * Pango.scale);
+  text_font#set (Pango.Font.to_string ft);
   save_pref ()
 
 end
@@ -1244,11 +1247,11 @@ end
 (** Refresh functions *)
 
 let refresh_notebook_pos () =
-  let pos = match vertical_tabs#get, opposite_tabs#get with
-    | false, false -> `TOP
-    | false, true  -> `BOTTOM
-    | true , false -> `LEFT
-    | true , true  -> `RIGHT
+  let pos = match document_tabs_pos#get with
+    | "left" -> `LEFT
+    | "right" -> `RIGHT
+    | "bottom" -> `BOTTOM
+    | _ -> `TOP
   in
   notebook#set_tab_pos pos
 
@@ -1277,12 +1280,13 @@ let get_shortcut s =
 module Opt = Coq.PrintOpt
 
 let toggle_items menu_name l =
-  let f d =
-    let label = d.Opt.label in
+  let f { Opt.label; Opt.init; Opt.opts } =
+    let label = label in
     let k, name = get_shortcut label in
     let accel = Option.map ((^) modifier_for_display#get) k in
-    toggle_item name ~label ?accel ~active:d.Opt.init
-      ~callback:(printopts_callback d.Opt.opts)
+    print_opt_item_names := name :: !print_opt_item_names;
+    toggle_item name ~label ?accel ~active:init
+      ~callback:(printopts_callback opts)
       menu_name
   in
   List.iter f l
@@ -1486,8 +1490,8 @@ let build_ui () =
           Pango.Font.set_size ft (Pango.Font.get_size ft - Pango.scale);
           text_font#set (Pango.Font.to_string ft);
           save_pref ());
-    item "Zoom 100" ~accel:("<Primary>0")
-        ~stock:`ZOOM_100 ~callback:(cb_on_current_term MiscMenu.zoom_100);
+    item "Zoom fit" ~accel:("<Primary>0")
+        ~stock:`ZOOM_FIT ~callback:(cb_on_current_term MiscMenu.zoom_fit);
     toggle_item "Show Toolbar" ~label:"Show _Toolbar"
       ~active:(show_toolbar#get)
       ~callback:(fun _ -> show_toolbar#set (not show_toolbar#get));
@@ -1514,7 +1518,7 @@ let build_ui () =
         radio "Set diff" 1 ~label:"Show diffs: only _added";
         radio "Set removed diff" 2 ~label:"Show diffs: added and _removed";
       ];
-    item "Show Proof Diffs" ~label:"_Show Proof (with diffs, if set)" ~accel:(modifier_for_display#get ^ "S")
+    item "Show Proof Diffs" ~label:"_Show Proof (with diffs, if set)" ~accel:("F8")
       ~callback:MiscMenu.show_proof_diffs;
   ];
   toggle_items view_menu Coq.PrintOpt.bool_items;
