@@ -73,8 +73,8 @@ object(self)
         if not buffer#modified then do_revert f
         else
           let answ = Preferences_ui.question_box
-            ~title:"Modified buffer changed on disk"
-            ~buttons:[ButtonUseStock `REVERT_TO_SAVED;
+            ~title:"Modified buffer changed on disk."
+            ~buttons:[ButtonUseString "Revert from file";
                       ButtonUseString "Overwrite file";
                       ButtonUseString "Disable Auto Revert"]
             ~default:0

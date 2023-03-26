@@ -67,7 +67,7 @@ let browser prefs arch =
   | Some b -> b
   | None when arch_is_win32 arch -> "start %s"
   | None when arch = "Darwin" -> "open %s"
-  | _ -> {|xdg-open %s &|}
+  | _ -> "xdg-open %s &"
 
 (** * OCaml programs *)
 module CamlConf = struct
