@@ -311,7 +311,7 @@ let select_and_save ?parent ~saveas ?filename sn =
       let ok = do_save f in
       confirm_save ok;
       if ok then begin
-        sn.tab_label#set_text (Filename.basename f);
+        sn.tab_label#set_text (Filename.remove_extension (Filename.basename f));
         sn.abs_file_name <- Some (Session.to_abs_file_name f);
         (* copying local breakpoints to other sessions seems pointless
            for a "save as" because the saved file needs to be compiled
@@ -1281,10 +1281,9 @@ module Opt = Coq.PrintOpt
 
 let toggle_items menu_name l =
   let f { Opt.label; Opt.init; Opt.opts } =
-    let label = label in
     let k, name = get_shortcut label in
     let accel = Option.map ((^) modifier_for_display#get) k in
-    print_opt_item_names := name :: !print_opt_item_names;
+    printopts_item_names := name :: !printopts_item_names;
     toggle_item name ~label ?accel ~active:init
       ~callback:(printopts_callback opts)
       menu_name
@@ -1416,7 +1415,7 @@ let build_ui () =
 
   menu file_menu [
     item "File" ~label:"_File";
-    item "New" ~callback:File.newfile ~stock:`NEW ~tooltip:"New buffer";
+    item "New" ~callback:File.newfile ~stock:`NEW;
     item "Open" ~callback:(File.load ~parent:w) ~stock:`OPEN ~tooltip:"Open file";
     item "Save" ~callback:(File.save ~parent:w) ~stock:`SAVE ~tooltip:"Save current buffer";
     item "Save as" ~stock:`SAVE_AS ~callback:(File.saveas ~parent:w);
@@ -1443,7 +1442,7 @@ let build_ui () =
     item "Edit" ~label:"_Edit";
     item "Undo" ~accel:"<Primary>z" ~stock:`UNDO
       ~callback:(cb_on_current_term (fun t -> t.script#undo ()));
-    item "Redo" ~accel:"<Primary>y" ~stock:`REDO
+    item "Redo" ~accel:"<Primary><Shift>z" ~stock:`REDO
       ~callback:(cb_on_current_term (fun t -> t.script#redo ()));
     item "Select All" ~accel:"<Primary>a" ~stock:`SELECT_ALL
       ~callback:(cb_on_current_term (fun t -> t.script#select_all ()));
@@ -1474,10 +1473,10 @@ let build_ui () =
 
   menu view_menu [
     item "View" ~label:"_View";
-    item "Previous tab" ~accel:"<Primary>Page_Up"
+    item "Previous tab" ~label:"_Previous tab" ~accel:"<Primary>Page_Up"
       ~stock:`GO_BACK
       ~callback:(fun _ -> notebook#previous_page ());
-    item "Next tab" ~accel:"<Primary>Page_Down"
+    item "Next tab" ~label:"_Next tab" ~accel:"<Primary>Page_Down"
       ~stock:`GO_FORWARD
       ~callback:(fun _ -> notebook#next_page ());
     item "Zoom in" ~accel:("<Primary>plus")
@@ -1536,16 +1535,16 @@ let build_ui () =
     ("Forward", "_Forward", `GO_DOWN, Nav.forward_one, "Forward one command", "Down");
     ("Backward", "_Backward", `GO_UP, Nav.backward_one, "Backward one command", "Up");
     ("Run to cursor", "Run to _cursor", `JUMP_TO, Nav.run_to_cursor, "Run to cursor", "Right");
-    ("Run to end", "_Run to end", `GOTO_BOTTOM, Nav.run_to_end, "Run to end", "End");
-    ("Interrupt", "_Interrupt", `STOP, Nav.interrupt, "Interrupt computations", "Break");
     ("Reset", "_Reset", `GOTO_TOP, Nav.restart, "Reset Coq", "Home");
+    ("Run to end", "_Run to end", `GOTO_BOTTOM, Nav.run_to_end, "Run to end", "End");
+    ("Force", "_Force", `EXECUTE, Nav.join_document, "Fully check the document", "Return");
+    ("Interrupt", "_Interrupt", `STOP, Nav.interrupt, "Interrupt computations", "Break");
     (* wait for this available in GtkSourceView !
     ("Hide", "_Hide", `MISSING_IMAGE,
         ~callback:(fun _ -> let sess = notebook#current_term in
           toggle_proof_visibility sess.buffer sess.analyzed_view#get_insert), "Hide proof", "h"); *)
     ("Previous", "_Previous", `GO_BACK, Nav.previous_occ, "Previous occurrence", "less");
     ("Next", "_Next", `GO_FORWARD, Nav.next_occ, "Next occurrence", "greater");
-    ("Force", "_Force", `EXECUTE, Nav.join_document, "Fully check the document", "Return");
   ] end;
 
   menu templates_menu [

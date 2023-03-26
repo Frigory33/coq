@@ -99,12 +99,12 @@ let init () =
     <menuitem action='Forward' />
     <menuitem action='Backward' />
     <menuitem action='Run to cursor' />
-    <menuitem action='Run to end' />
-    <menuitem action='Interrupt' />
     <menuitem action='Reset' />
+    <menuitem action='Run to end' />
+    <menuitem action='Force' />
+    <menuitem action='Interrupt' />
     <menuitem action='Previous' />
     <menuitem action='Next' />
-    <menuitem action='Force' />
   </menu>
   <menu action='Templates'>
     <menuitem action='Lemma' />
@@ -162,7 +162,6 @@ let init () =
   </menu>
 </menubar>
 <toolbar name='CoqIDE ToolBar'>
-  <toolitem action='New' />
   <toolitem action='Open' />
   <toolitem action='Save' />
   <toolitem action='Close buffer' />
@@ -170,10 +169,10 @@ let init () =
   <toolitem action='Forward' />
   <toolitem action='Backward' />
   <toolitem action='Run to cursor' />
+  <toolitem action='Reset' />
   <toolitem action='Run to end' />
   <toolitem action='Force' />
   <toolitem action='Interrupt' />
-  <toolitem action='Reset' />
   <toolitem action='Previous' />
   <toolitem action='Next' />
 </toolbar>

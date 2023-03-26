@@ -29,7 +29,7 @@ type pref_category = {
 
 type pref_widget = { widget: GObj.widget; apply: unit -> unit }
 
-type return_button = Preferences_Apply | Preferences_OK | Preferences_Cancel
+type pref_ui_return = Preferences_Apply | Preferences_OK | Preferences_Cancel
 
 let pref_category label ?icon ?(children = []) sections =
   { label; icon; sections; children }
@@ -389,20 +389,35 @@ let configure ?(apply = fun () -> ()) parent =
     create_pref_section ~in_grid:true "File format" [
       pcombo "File charset encoding:" ~editable:true
         ("UTF-8" :: "LOCALE" :: match encoding#get with Emanual s -> [s] | _ -> [])
-        (string_of_inputenc encoding#get)
-        (fun _ s -> encoding#set (inputenc_of_string s));
-      pcombo "EOL character:" ["Default"; {|Linux (\n)|}; {|Windows (\r\n)|}]
-        (line_end_to_string line_ending#get)
-        (fun _ s -> line_ending#set (line_end_of_string s));
+        (encoding#repr#raw_from encoding#get)
+        (fun _ s -> encoding#set (encoding#repr#raw_into s));
+      let values = [`DEFAULT; `UNIX; `WINDOWS] in
+      let labels = ["Default"; {|Linux (\n)|}; {|Windows (\r\n)|}] in
+      pcombo "EOL character:" labels
+        (List.nth labels (match find_index_opt line_ending#get values with Some i -> i | _ -> 0))
+        (fun i _ -> line_ending#set (List.nth values i));
+    ]
+  in
+  let global_auto_revert =
+    create_pref_section "Global auto revert" [
+      pbool "Enable" global_auto_revert;
+      pint "Delay (ms):" global_auto_revert_delay;
+    ]
+  in
+  let auto_save =
+    create_pref_section "Auto save" [
+      pbool "Enable" auto_save;
+      pint "Delay (ms):" auto_save_delay;
+      (* auto_save_name *)
     ]
   in
 
   let project_management =
     create_pref_section "Project management" [
         pstring "Default name for project file:" project_file_name;
-        pcombo "Project file options are" (List.map string_of_project_behavior [Subst_args; Append_args; Ignore_args])
-          (string_of_project_behavior read_project#get)
-          (fun _ s -> read_project#set (project_behavior_of_string s));
+        pcombo "Project file options are" (List.map read_project#repr#raw_from [Subst_args; Append_args; Ignore_args])
+          (read_project#repr#raw_from read_project#get)
+          (fun _ s -> read_project#set (read_project#repr#raw_into s));
       ];
   in
 
@@ -410,10 +425,10 @@ let configure ?(apply = fun () -> ()) parent =
     create_pref_section "Editor appearance" [
         pbool "Dynamic word wrap" dynamic_word_wrap;
         pbool "Show line number" show_line_number;
-        pbool "Show spaces" show_spaces;
-        pbool "Show right margin" show_right_margin;
-        pbool "Show progress bar" show_progress_bar;
         pbool "Highlight current line" highlight_current_line;
+        pbool "Show right margin" show_right_margin;
+        pbool "Show spaces" show_spaces;
+        pbool "Show progress bar" show_progress_bar;
       ]
   in
   let editor_behavior =
@@ -425,84 +440,6 @@ let configure ?(apply = fun () -> ()) parent =
         pint "Delay (ms):" ~max:5000 auto_complete_delay;
         pbool "Emacs/PG keybindings (μPG mode)" microPG;
       ]
-  in
-
-  let global_auto_revert =
-    create_pref_section "Global auto revert" [
-      pbool "Enable" global_auto_revert;
-      pint "Delay (ms):" global_auto_revert_delay;
-    ]
-  in
-
-  let auto_save =
-    create_pref_section "Auto save" [
-      pbool "Enable" auto_save;
-      pint "Delay (ms):" auto_save_delay;
-      (* auto_save_name *)
-    ]
-  in
-
-  let config_highlight =
-    let source_param text ids elem_get pref =
-      let id_to_name id =
-        match elem_get id with
-        | Some elem -> elem#name
-        | None -> ""
-      in
-      let names = List.map id_to_name ids in
-      let ids = Array.of_list ids in
-      pcombo text names (id_to_name pref#get) (fun i _ -> pref#set ids.(i))
-    in
-    create_pref_section ~in_grid:true "Highlight configuration" [
-        source_param "Style scheme:" style_manager#style_scheme_ids
-          style_manager#style_scheme source_style;
-        source_param "Language:"
-          (List.filter (CString.is_prefix "coq") lang_manager#language_ids)
-          lang_manager#language source_language;
-      ]
-  in
-
-  let config_color =
-    let box = GPack.vbox () in
-    let grid = GPack.grid
-      ~row_spacings:5
-      ~col_spacings:5
-      ~border_width:4
-      ~packing:(box#pack ~expand:true) ()
-    in
-    let reset_button = GButton.button ~label:"Reset" ~packing:box#pack () in
-    let apply_list = ref [] in
-    let _ =
-      GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) (),
-      GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) ()
-    in
-    let iter i (text, prefs) =
-      let top = i + 1 in
-      (GMisc.label ~text ~packing:(grid#attach ~left:0 ~top) ())#set_halign `START;
-      List.iteri (fun i pref ->
-        let button = GButton.color_button
-          ~color:(Gdk.Color.color_parse pref#get)
-          ~packing:(grid#attach ~left:(i + 1) ~top) ()
-        in
-        apply_list := (fun () -> pref#set (Gdk.Color.color_to_string button#color)) :: !apply_list;
-        let _ = reset_button#connect#clicked ~callback:(fun () ->
-            pref#reset ();
-            button#set_color (Gdk.Color.color_parse pref#get);
-          )
-        in
-        ()) prefs;
-    in
-    let () = Util.List.iteri iter [
-      (*"Editor", [background_color]; *)
-      "Processed text", [processed_color];
-      "Text being processed", [processing_color];
-      "Incompletely processed Qed", [incompletely_processed_color];
-      "Breakpoints", [breakpoint_color];
-      "Debugger stopping point", [db_stopping_point_color];
-      "Errors", [error_color; error_fg_color];
-    ] in
-    let label = "Color configuration" in
-    { label; box; apply = fun () -> List.iter (fun apply -> apply ()) !apply_list }
   in
 
   let config_window =
@@ -551,6 +488,68 @@ let configure ?(apply = fun () -> ()) parent =
       let _ = font_sel#connect#activate ~callback:set_font in
       { label = "Text font"; box; apply = set_font }
     )
+  in
+
+  let config_highlight =
+    let source_param text ids elem_get pref =
+      let id_to_name id =
+        match elem_get id with
+        | Some elem -> elem#name
+        | None -> ""
+      in
+      let names = List.map id_to_name ids in
+      let ids = Array.of_list ids in
+      pcombo text names (id_to_name pref#get) (fun i _ -> pref#set ids.(i))
+    in
+    create_pref_section ~in_grid:true "Highlight configuration" [
+        source_param "Style scheme:" style_manager#style_scheme_ids
+          style_manager#style_scheme source_style;
+        source_param "Language:"
+          (List.filter (CString.is_prefix "coq") lang_manager#language_ids)
+          lang_manager#language source_language;
+      ]
+  in
+  let config_color =
+    let box = GPack.vbox () in
+    let grid = GPack.grid
+      ~row_spacings:5
+      ~col_spacings:5
+      ~border_width:4
+      ~packing:(box#pack ~expand:true) ()
+    in
+    let reset_button = GButton.button ~label:"Reset" ~packing:box#pack () in
+    let apply_list = ref [] in
+    let _ =
+      GMisc.label ~text:"Background" ~packing:(grid#attach ~left:1 ~top: 0) (),
+      GMisc.label ~text:"Foreground" ~packing:(grid#attach ~left:2 ~top: 0) ()
+    in
+    let iter i (text, prefs) =
+      let top = i + 1 in
+      (GMisc.label ~text ~packing:(grid#attach ~left:0 ~top) ())#set_halign `START;
+      List.iteri (fun i pref ->
+        let button = GButton.color_button
+          ~color:(Gdk.Color.color_parse pref#get)
+          ~packing:(grid#attach ~left:(i + 1) ~top) ()
+        in
+        apply_list := (fun () -> pref#set (Gdk.Color.color_to_string button#color)) :: !apply_list;
+        let _ = reset_button#connect#clicked ~callback:(fun () ->
+            pref#reset ();
+            button#set_color (Gdk.Color.color_parse pref#get);
+          )
+        in
+        ()) prefs;
+    in
+    let () = Util.List.iteri iter [
+      (*"Editor", [background_color]; *)
+      "Processed text", [processed_color];
+      "Text being processed", [processing_color];
+      "Incompletely processed Qed", [incompletely_processed_color];
+      "Breakpoints", [breakpoint_color];
+      "Debugger stopping point", [db_stopping_point_color];
+      "Errors", [error_color; error_fg_color];
+    ] in
+    let label = "Color configuration" in
+    { label; box; apply = fun () -> List.iter (fun apply -> apply ()) !apply_list }
   in
 
   let config_tags =
@@ -675,11 +674,10 @@ let configure ?(apply = fun () -> ()) parent =
       pref_category "Files" ~icon:`FLOPPY [file_format; global_auto_revert; auto_save] ~children:[
           pref_category "Project" ~icon:`PAGE_SETUP [project_management];
         ];
-      pref_category "Editor" ~icon:`EDIT [editor_appearance; editor_behavior] ~children:[
-          pref_category "Colors" ~icon:`SELECT_COLOR [config_highlight; config_color];
-        ];
+      pref_category "Editor" ~icon:`EDIT [editor_appearance; editor_behavior];
       pref_category "Appearance" ~icon:`ZOOM_FIT [config_window; config_document_tabs] ~children:[
           pref_category "Font" ~icon:`SELECT_FONT [config_font];
+          pref_category "Colors" ~icon:`SELECT_COLOR [config_highlight; config_color];
           pref_category "Tags" ~icon:`SELECT_COLOR [config_tags];
         ];
       pref_category "Shortcuts" ~icon:`MEDIA_FORWARD [modifiers_valid; config_modifiers];

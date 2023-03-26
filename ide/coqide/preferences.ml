@@ -35,10 +35,12 @@ type obj = {
 let preferences : obj Util.String.Map.t ref = ref Util.String.Map.empty
 let unknown_preferences : string list Util.String.Map.t ref = ref Util.String.Map.empty
 
-class type ['a] repr =
-object
-  method into : string list -> 'a option
-  method from : 'a -> string list
+class virtual ['a] repr =
+object(self)
+  method raw_into v = Option.get (self#into [v])
+  method raw_from s = List.hd (self#from s)
+  method virtual into : string list -> 'a option
+  method virtual from : 'a -> string list
 end
 
 class ['a] preference_signals ~(changed : 'a GUtil.signal) =
@@ -52,7 +54,7 @@ object (self)
   initializer
     let set v = match repr#into v with None -> () | Some s -> self#set s in
     let get () = repr#from self#get in
-    let obj = { set = set; get = get; } in
+    let obj = { set; get } in
     let name = String.concat "." name in
     if Util.String.Map.mem name !preferences then
       invalid_arg ("Preference " ^ name ^ " already exists")
@@ -68,6 +70,7 @@ object (self)
   method set (n : 'a) = data <- n; changed#call n
   method reset () = self#set default
   method default = default
+  method repr = repr
 end
 
 let stick (pref : 'a preference) (obj : < connect : #GObj.widget_signals ; .. >)
@@ -115,116 +118,128 @@ let string_of_inputenc = function
 | Eutf8 -> "UTF-8"
 | Emanual s -> s
 
-let inputenc_of_string s =
-      (if s = "UTF-8" then Eutf8
-       else if s = "LOCALE" then Elocale
-       else Emanual s)
+let inputenc_of_string = function
+| "UTF-8" -> Eutf8
+| "LOCALE" -> Elocale
+| s -> Emanual s
 
 type line_ending = [ `DEFAULT | `WINDOWS | `UNIX ]
 
 let line_end_of_string = function
-| "Linux" -> `UNIX
-| "Windows" -> `WINDOWS
+| "unix" -> `UNIX
+| "windows" -> `WINDOWS
 | _ -> `DEFAULT
 
 let line_end_to_string = function
-| `UNIX -> "Linux"
-| `WINDOWS -> "Windows"
-| `DEFAULT -> "Default"
+| `UNIX -> "unix"
+| `WINDOWS -> "windows"
+| `DEFAULT -> "default"
 
 let use_default_doc_url = "(automatic)"
 
-module Repr = struct
+module Repr =
+struct
 
-  let string : string repr =
-  object
-    method from s = [s]
-    method into = function [s] -> Some s | _ -> None
-  end
+let string : string repr =
+object
+  inherit [string] repr
+  method from s = [s]
+  method into = function [s] -> Some s | _ -> None
+end
 
-  let string_pair : (string * string) repr =
-  object
-    method from (s1, s2) = [s1; s2]
-    method into = function [s1; s2] -> Some (s1, s2) | _ -> None
-  end
+let string_pair : (string * string) repr =
+object
+  inherit [string * string] repr
+  method from (s1, s2) = [s1; s2]
+  method into = function [s1; s2] -> Some (s1, s2) | _ -> None
+end
 
-  let string_list : string list repr =
-  object
-    method from s = s
-    method into s = Some s
-  end
+let string_list : string list repr =
+object
+  inherit [string list] repr
+  method from s = s
+  method into s = Some s
+end
 
-  let string_pair_list (sep : char) : (string * string) list repr =
-  object
-    val sep' = String.make 1 sep
-    method from = CList.map (fun (s1, s2) -> CString.concat sep' [s1; s2])
-    method into l =
-      try
-        Some (CList.map (fun s ->
-          let split = String.split_on_char sep s in
-          CList.nth split 0, CList.nth split 1) l)
-      with Failure _ -> None
-  end
+let string_pair_list (sep : char) : (string * string) list repr =
+object
+  inherit [(string * string) list] repr
+  val sep' = String.make 1 sep
+  method from = CList.map (fun (s1, s2) -> CString.concat sep' [s1; s2])
+  method into l =
+    try
+      Some (CList.map (fun s ->
+        let split = String.split_on_char sep s in
+        CList.nth split 0, CList.nth split 1) l)
+    with Failure _ -> None
+end
 
-  let bool : bool repr =
-  object
-    method from s = [string_of_bool s]
-    method into = function
-    | ["true"] -> Some true
-    | ["false"] -> Some false
-    | _ -> None
-  end
+let bool : bool repr =
+object
+  inherit [bool] repr
+  method from s = [string_of_bool s]
+  method into = function
+  | ["true"] -> Some true
+  | ["false"] -> Some false
+  | _ -> None
+end
 
-  let int : int repr =
-  object
-    method from s = [string_of_int s]
-    method into = function
-    | [i] -> (try Some (int_of_string i) with _ -> None)
-    | _ -> None
-  end
+let int : int repr =
+object
+  inherit [int] repr
+  method from s = [string_of_int s]
+  method into = function
+  | [i] -> (try Some (int_of_string i) with _ -> None)
+  | _ -> None
+end
 
-  let option (r : 'a repr) : 'a option repr =
-  object
-    method from = function None -> [] | Some v -> "" :: r#from v
-    method into = function
-    | [] -> Some None
-    | "" :: s -> Some (r#into s)
-    | _ -> None
-  end
+let option (r : 'a repr) : 'a option repr =
+object
+  inherit ['a option] repr
+  method from = function None -> [] | Some v -> "" :: r#from v
+  method into = function
+  | [] -> Some None
+  | "" :: s -> Some (r#into s)
+  | _ -> None
+end
 
-  let custom (from : 'a -> string) (into : string -> 'a) : 'a repr =
-  object
-    method from x = try [from x] with _ -> []
-    method into = function
-    | [s] -> (try Some (into s) with _ -> None)
-    | _ -> None
-  end
+let custom (from : 'a -> string) (into : string -> 'a) : 'a repr =
+object
+  inherit ['a] repr
+  method! raw_from = from
+  method! raw_into = into
+  method from x = try [from x] with _ -> []
+  method into = function
+  | [s] -> (try Some (into s) with _ -> None)
+  | _ -> None
+end
 
-  let tag : tag repr =
-  let _to s = if s = "" then None else Some s in
-  let _of = function None -> "" | Some s -> s in
-  object
-    method from tag = [
-      _of tag.tag_fg_color;
-      _of tag.tag_bg_color;
-      string_of_bool tag.tag_bold;
-      string_of_bool tag.tag_italic;
-      string_of_bool tag.tag_underline;
-      string_of_bool tag.tag_strikethrough;
-    ]
-    method into = function
-    | [fg; bg; bd; it; ul; st] ->
-      (try Some {
-        tag_fg_color = _to fg;
-        tag_bg_color = _to bg;
-        tag_bold = bool_of_string bd;
-        tag_italic = bool_of_string it;
-        tag_underline = bool_of_string ul;
-        tag_strikethrough = bool_of_string st;
-        }
-      with _ -> None)
-    | _ -> None
-  end
+let tag : tag repr =
+let _to s = if s = "" then None else Some s in
+let _of = function None -> "" | Some s -> s in
+object
+  inherit [tag] repr
+  method from tag = [
+    _of tag.tag_fg_color;
+    _of tag.tag_bg_color;
+    string_of_bool tag.tag_bold;
+    string_of_bool tag.tag_italic;
+    string_of_bool tag.tag_underline;
+    string_of_bool tag.tag_strikethrough;
+  ]
+  method into = function
+  | [fg; bg; bd; it; ul; st] ->
+    (try Some {
+      tag_fg_color = _to fg;
+      tag_bg_color = _to bg;
+      tag_bold = bool_of_string bd;
+      tag_italic = bool_of_string it;
+      tag_underline = bool_of_string ul;
+      tag_strikethrough = bool_of_string st;
+      }
+    with _ -> None)
+  | _ -> None
+end
 
 end
 
@@ -332,17 +347,17 @@ let modifier_for_display =
 let modifier_for_queries =
   new preference ~name:["modifier_for_queries"] ~init:"<Control><Shift>" ~repr:Repr.(string)
 
-let print_opt_item_names = ref []
+let printopts_item_names = ref []
 
 let attach_modifiers_callback () =
   (* Tell to propagate changes done in preference menu to accel map *)
   (* To be done after the preferences are loaded *)
-  let print_opts_filter path =
+  let printopts_filter path =
     let last_slash_pos = String.rindex path '/' in
     let item_name = String.sub path (last_slash_pos + 1) (String.length path - last_slash_pos - 1) in
-    List.mem item_name !print_opt_item_names
+    List.mem item_name !printopts_item_names
   in
-  attach_modifiers modifier_for_display "<Actions>/View/" ~filter:print_opts_filter;
+  attach_modifiers modifier_for_display "<Actions>/View/" ~filter:printopts_filter;
   attach_modifiers modifier_for_navigation "<Actions>/Navigation/";
   attach_modifiers modifier_for_templates "<Actions>/Templates/";
   attach_modifiers modifier_for_queries "<Actions>/Queries/";

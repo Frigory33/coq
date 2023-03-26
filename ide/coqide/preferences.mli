@@ -24,10 +24,12 @@ type tag = {
   tag_strikethrough : bool;
 }
 
-class type ['a] repr =
+class virtual ['a] repr :
 object
-  method into : string list -> 'a option
-  method from : 'a -> string list
+  method raw_into : string -> 'a
+  method raw_from : 'a -> string
+  method virtual into : string list -> 'a option
+  method virtual from : 'a -> string list
 end
 
 class ['a] preference_signals : changed:'a GUtil.signal ->
@@ -43,6 +45,7 @@ object
   method set : 'a -> unit
   method reset : unit -> unit
   method default : 'a
+  method repr: 'a repr
 end
 
 val list_tags : unit -> tag preference Util.String.Map.t
@@ -53,16 +56,7 @@ val get_unicode_bindings_default_file : unit -> string option
 val str_to_mod_list : string -> Gdk.Tags.modifier list
 val mod_list_to_str : Gdk.Tags.modifier list -> string
 
-val string_of_inputenc : inputenc -> string
-val inputenc_of_string : string -> inputenc
-
-val line_end_to_string : line_ending -> string
-val line_end_of_string : string -> line_ending
-
-val string_of_project_behavior : project_behavior -> string
-val project_behavior_of_string : string -> project_behavior
-
-val print_opt_item_names : string list ref
+val printopts_item_names : string list ref
 
 val select_arch : 'a -> 'a -> 'a
 

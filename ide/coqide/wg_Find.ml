@@ -14,10 +14,9 @@ class finder name (view : GText.view) =
 
   let widget = Wg_Detachable.detachable
     ~title:(Printf.sprintf "Find & Replace (%s)" name) () in
-  let replace_box = GPack.grid (* ~columns:4 ~rows:2 *) ~col_homogeneous:false ~row_homogeneous:false
+  let replace_box = GPack.grid ~col_homogeneous:false ~row_homogeneous:false
     ~packing:widget#add () in
-  let hb = GPack.hbox ~packing:(replace_box#attach
-      ~left:1 ~top:0 (*~expand:`X ~fill:`X*)) () in
+  let hb = GPack.hbox ~packing:(replace_box#attach ~left:1 ~top:0) () in
   let use_regex =
     GButton.check_button ~label:"Regular expression"
       ~packing:(hb#pack ~expand:false ~fill:true ~padding:3) () in
@@ -25,29 +24,25 @@ class finder name (view : GText.view) =
     GButton.check_button ~label:"Case insensitive"
       ~packing:(hb#pack ~expand:false ~fill:true ~padding:3) () in
   let find_label = GMisc.label ~text:"Find:"
-    ~packing:(replace_box#attach
-     (*~xpadding:3 ~ypadding:3*) ~left:0 ~top:1 (*~fill:`X*)) () in
+    ~packing:(replace_box#attach ~left:0 ~top:1) () in
   let replace_label = GMisc.label ~text:"Replace:"
-    ~packing:(replace_box#attach
-     (* ~xpadding:3 ~ypadding:3*) ~left:0 ~top:2 (*~fill:`X*)) () in
+    ~packing:(replace_box#attach ~left:0 ~top:2) () in
   let () = List.iter (fun label ->
       label#set_halign `START; label#set_margin_left 4; label#set_margin_right 4;
     ) [find_label; replace_label] in
   let find_entry = GEdit.entry ~editable:true
-    ~packing:(replace_box#attach
-      (*~xpadding:3 ~ypadding:3*) ~left:1 ~top:1 (*~expand:`X ~fill:`X*)) () in
+    ~packing:(replace_box#attach ~left:1 ~top:1) () in
   let replace_entry = GEdit.entry ~editable:true
-    ~packing:(replace_box#attach
-      (*~xpadding:3 ~ypadding:3*) ~left:1 ~top:2 (*~expand:`X ~fill:`X*)) () in
+    ~packing:(replace_box#attach ~left:1 ~top:2) () in
   let next_button = GButton.button ~label:"_Next" ~use_mnemonic:true
-    ~packing:(replace_box#attach (*~xpadding:3 ~ypadding:3*) ~left:2 ~top:1) () in
+    ~packing:(replace_box#attach ~left:2 ~top:1) () in
   let previous_button = GButton.button ~label:"_Previous" ~use_mnemonic:true
-    ~packing:(replace_box#attach (*~xpadding:3 ~ypadding:3*) ~left:3 ~top:1) () in
+    ~packing:(replace_box#attach ~left:3 ~top:1) () in
   let replace_button = GButton.button ~label:"_Replace" ~use_mnemonic:true
-    ~packing:(replace_box#attach (*~xpadding:3 ~ypadding:3*) ~left:2 ~top:2) () in
+    ~packing:(replace_box#attach ~left:2 ~top:2) () in
   let replace_all_button =
     GButton.button ~label:"Replace _All" ~use_mnemonic:true
-      ~packing:(replace_box#attach (*~xpadding:3 ~ypadding:3*) ~left:3 ~top:2) () in
+      ~packing:(replace_box#attach ~left:3 ~top:2) () in
   let () = List.iter (fun button -> button#set_margin_left 2)
     [next_button; previous_button; replace_button; replace_all_button] in
 

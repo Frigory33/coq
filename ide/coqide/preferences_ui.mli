@@ -27,7 +27,7 @@ type pref_category = {
 }
 
 (** To indicate what button pushed the user when the window is closed. *)
-type return_button =
+type pref_ui_return =
   | Preferences_Apply
       (** The user clicked on Apply at least once before
           closing the window with Cancel or the window manager. *)
@@ -55,7 +55,7 @@ val edit_preferences :
   ?parent: GWindow.window -> ?width: int -> ?height: int ->
   ?current_section: int array option ref ->
   pref_category list ->
-  return_button
+  pref_ui_return
 
 (** This functions shows the main preferences configuration dialog. *)
 val configure : ?apply: (unit -> unit) -> GWindow.window -> unit
