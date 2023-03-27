@@ -372,7 +372,7 @@ for the new binding and then releasing the mouse button.
 Alternatively, you can edit the configuration file directly.
 A GTK+ accelerator keymap is saved under the name `coqide.keys` in
 the :ref:`user configuration directory<user-configuration-directory>`.
-Make sure there are no CoqIDE processes running while you edit the file. 
+Make sure there are no CoqIDE processes running while you edit the file
 (CoqIDE creates or overwrites the file when it terminates,
 which may reorder the lines).
 

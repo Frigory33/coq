@@ -565,7 +565,7 @@ let dynamic_word_wrap =
   new preference ~name:["dynamic_word_wrap"] ~init:false ~repr:Repr.(bool)
 
 let show_line_number =
-  new preference ~name:["show_line_number"] ~init:true ~repr:Repr.(bool)
+  new preference ~name:["show_line_number"] ~init:false ~repr:Repr.(bool)
 
 let auto_indent =
   new preference ~name:["auto_indent"] ~init:true ~repr:Repr.(bool)
