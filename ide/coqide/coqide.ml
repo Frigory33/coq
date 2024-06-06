@@ -1435,7 +1435,7 @@ let build_ui () =
     item "Latex" ~label:"_LaTeX" ~callback:(File.export "latex");
     item "Dvi" ~label:"_DVI" ~callback:(File.export "dvi");
     item "Pdf" ~label:"_PDF" ~callback:(File.export "pdf");
-    item "Ps" ~label:"_PostScript" ~callback:(File.export "ps");
+    item "Ps" ~label:"P_ostScript" ~callback:(File.export "ps");
   ];
 
   menu edit_menu [
@@ -1589,7 +1589,7 @@ let build_ui () =
       ~callback:(cb_on_current_term (fun t -> t.script#uncomment ()));
     item "Coqtop arguments" ~label:"Coqtop _arguments"
       ~callback:MiscMenu.coqtop_arguments;
-    item "LaTeX-to-unicode" ~label:"_LaTeX-to-unicode" ~accel:"<Shift>space"
+    item "LaTeX-to-unicode" ~label:"_LaTeX-to-unicode" ~accel:"<Primary>space"
       ~callback:MiscMenu.apply_unicode_binding;
   ];
 
